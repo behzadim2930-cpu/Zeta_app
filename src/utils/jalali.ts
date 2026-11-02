@@ -184,23 +184,72 @@ export function formatJalali(
 }
 
 export interface PersianWeekInfo {
-  startStr: string; // e.g. "شنبه ۲ آبان ۱۴۰۵"
-  endStr: string;   // e.g. "جمعه ۸ آبان ۱۴۰۵"
+  startStr: string; // e.g. "دوشنبه ۱۲ آبان ۱۴۰۵"
+  endStr: string;   // e.g. "یکشنبه ۱۸ آبان ۱۴۰۵"
   startDate: JalaliDate;
   endDate: JalaliDate;
   weekDays: Array<{
-    dayIndex: number; // 0 to 6 (Saturday to Friday)
-    name: string;     // "شنبه", "یکشنبه", ...
-    dateStr: string;  // "۲ آبان"
-    fullStr: string;  // "شنبه ۲ آبان ۱۴۰۵"
+    dayIndex: number; // 0 to 6
+    name: string;     // نام روز هفته (مثلا "دوشنبه", "سه‌شنبه", ...)
+    dateStr: string;  // "۱۲ آبان"
+    fullStr: string;  // "دوشنبه ۱۲ آبان ۱۴۰۵"
     jalali: JalaliDate;
   }>;
 }
 
 /**
- * با دریافت یک روز، بازه کامل هفتگی آن (از شنبه تا جمعه) را استخراج می‌کند
+ * بر اساس تاریخ شروع دلخواه مشاور، برنامه ۷ روزه را محاسبه می‌کند:
+ * از همان روز انتخاب شده شروع شده و به مدت ۷ روز متوالی ادامه می‌یابد
+ * (مثلاً از دوشنبه تا یکشنبه یا از چهارشنبه تا سه‌شنبه)
  */
-export function getWeekRangeFromJalali(selected: JalaliDate): PersianWeekInfo {
+export function get7DaysPlanFromStartDate(startDate: JalaliDate): PersianWeekInfo {
+  const gDate = jalaliToGregorian(startDate.year, startDate.month, startDate.day);
+
+  const weekDays = [];
+  for (let i = 0; i < 7; i++) {
+    const targetGDate = new Date(gDate.getTime() + i * 86400000);
+    const targetJ = gregorianToJalali(
+      targetGDate.getFullYear(),
+      targetGDate.getMonth() + 1,
+      targetGDate.getDate()
+    );
+    const dayName = getJalaliDayOfWeekName(targetJ);
+    const monthName = PERSIAN_MONTH_NAMES[targetJ.month - 1];
+    const dayFa = toPersianDigits(targetJ.day);
+    const yearFa = toPersianDigits(targetJ.year);
+
+    weekDays.push({
+      dayIndex: i,
+      name: dayName,
+      dateStr: `${dayFa} ${monthName}`,
+      fullStr: `${dayName} ${dayFa} ${monthName} ${yearFa}`,
+      jalali: targetJ,
+    });
+  }
+
+  return {
+    startStr: weekDays[0].fullStr,
+    endStr: weekDays[6].fullStr,
+    startDate: weekDays[0].jalali,
+    endDate: weekDays[6].jalali,
+    weekDays,
+  };
+}
+
+/**
+ * دریافت بازه هفته شمسی:
+ * در صورت customStart = true، برنامه از همان تاریخ انتخابی شروع می‌شود
+ * در صورت customStart = false، هفته به شنبه تا جمعه قفل می‌شود
+ */
+export function getWeekRangeFromJalali(
+  selected: JalaliDate,
+  rangeType: 'fromSelected' | 'saturdayToFriday' = 'fromSelected'
+): PersianWeekInfo {
+  if (rangeType === 'fromSelected') {
+    return get7DaysPlanFromStartDate(selected);
+  }
+
+  // saturdayToFriday mode
   const gDate = jalaliToGregorian(selected.year, selected.month, selected.day);
   const jsDay = gDate.getDay(); // 0 is Sunday, 6 is Saturday
   const pDayIndex = (jsDay + 1) % 7; // 0 = شنبه, ..., 6 = جمعه

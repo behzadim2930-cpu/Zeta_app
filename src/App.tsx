@@ -47,7 +47,7 @@ import {
   CalendarDays,
 } from 'lucide-react';
 import { PersianDatePickerModal } from './components/PersianDatePicker';
-import { PersianWeekInfo, formatJalali } from './utils/jalali';
+import { PersianWeekInfo, formatJalali, get7DaysPlanFromStartDate } from './utils/jalali';
 
 interface Block {
   id: string;
@@ -381,19 +381,23 @@ export default function App() {
     title: 'انتخابگر تقویم شمسی',
   });
 
-  // Handle Persian Week Selection from Calendar (Auto-fills start, end, and all 7 day dates!)
+  // Handle Persian Week Selection from Calendar (Auto-fills start, end, and all 7 day names and dates!)
   const handleSelectPersianWeek = (weekInfo: PersianWeekInfo) => {
     setWeekRange({
       start: weekInfo.startStr,
       end: weekInfo.endStr,
     });
 
-    // Auto-update each day's date string with the accurate Shamsi calendar date
+    // Auto-update each day's day of week name and date string with the chosen start day
     setDays((prevDays) =>
       prevDays.map((d, idx) => {
-        const matched = weekInfo.weekDays.find((w) => w.dayIndex === idx);
+        const matched = weekInfo.weekDays[idx];
         if (matched) {
-          return { ...d, dateStr: matched.dateStr };
+          return {
+            ...d,
+            name: matched.name,      // e.g. "دوشنبه", "سه‌شنبه", ...
+            dateStr: matched.dateStr // e.g. "۱۲ آبان", "۱۳ آبان", ...
+          };
         }
         return d;
       })
@@ -405,19 +409,28 @@ export default function App() {
       createdDate: prev.createdDate || weekInfo.weekDays[0].dateStr,
     }));
 
-    setPdfSuccessMessage(`📅 بازه زمانی هفته (${weekInfo.startStr} تا ${weekInfo.endStr}) با موفقیت از تقویم شمسی تنظیم شد.`);
+    setPdfSuccessMessage(`📅 برنامه ۷ روزه از «${weekInfo.weekDays[0].name} ${weekInfo.weekDays[0].dateStr}» تا «${weekInfo.weekDays[6].name} ${weekInfo.weekDays[6].dateStr}» با موفقیت تنظیم شد.`);
     setTimeout(() => setPdfSuccessMessage(null), 5000);
   };
 
   // Handle Single Date Selection from Calendar
   const handleSelectSingleDate = (formattedDate: string, jalali: any) => {
     if (datePickerState.targetField === 'start') {
-      setWeekRange((prev) => ({ ...prev, start: formattedDate }));
+      // If consultant picks start date, automatically calculate 7-day plan starting from that day!
+      const weekInfo = get7DaysPlanFromStartDate(jalali);
+      handleSelectPersianWeek(weekInfo);
     } else if (datePickerState.targetField === 'end') {
       setWeekRange((prev) => ({ ...prev, end: formattedDate }));
     } else if (datePickerState.targetField === 'createdDate') {
       setAdvisor((prev) => ({ ...prev, createdDate: formatJalali(jalali, 'full') }));
     }
+  };
+
+  // Helper to allow consultant to edit day name manually if desired
+  const updateDayName = (dayId: number, newName: string) => {
+    setDays((prev) =>
+      prev.map((d) => (d.id === dayId ? { ...d, name: newName } : d))
+    );
   };
 
   const [goals, setGoals] = useState([
@@ -2306,14 +2319,14 @@ export default function App() {
                     setDatePickerState({
                       isOpen: true,
                       mode: 'week',
-                      title: 'انتخاب تقویمی بازه زمانی هفته (شنبه تا جمعه)',
+                      title: 'انتخاب تقویمی بازه برنامه هفتگی (شروع از هر روز دلخواه)',
                     })
                   }
                   className="bg-[#FF4F12] hover:bg-[#e0450f] text-white px-3 py-1.5 rounded-xl text-xs font-black flex items-center gap-1.5 shadow-xs hover:shadow transition cursor-pointer"
-                  title="انتخاب تقویمی بازه شنبه تا جمعه با تنظیم خودکار تاریخ تمام روزها"
+                  title="انتخاب روز شروع برنامه و تنظیم خودکار نام و تاریخ تمام ۷ روز"
                 >
                   <CalendarDays className="w-3.5 h-3.5" />
-                  <span>📅 انتخاب تقویمی بازه هفتگی (شنبه تا جمعه)</span>
+                  <span>📅 انتخاب تقویمی شروع برنامه (تنظیم خودکار ۷ روز)</span>
                 </button>
               </div>
 
@@ -2324,12 +2337,12 @@ export default function App() {
                     <Calendar className="w-3.5 h-3.5" />
                   </div>
                   <span className="text-neutral-700 font-bold text-[11.5px]">
-                    بازه انتخابی فعال: <b className="text-neutral-900 font-black">{weekRange.start || 'شنبه'}</b> تا <b className="text-[#C93A00] font-black">{weekRange.end || 'جمعه'}</b>
+                    بازه زمانی فعال برنامه: <b className="text-neutral-900 font-black">{weekRange.start || 'روز شروع'}</b> تا <b className="text-[#C93A00] font-black">{weekRange.end || 'روز پایان'}</b>
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-[10.5px] text-neutral-500 hidden sm:inline">
-                    با انتخاب از تقویم، تاریخ تمام ۷ روز خودکار ثبت می‌شود
+                    برنامه می‌تواند از هر روزی آغاز شود؛ ۷ روز هفته به صورت هوشمند مرتب می‌شوند
                   </span>
                   <button
                     type="button"
@@ -2337,7 +2350,7 @@ export default function App() {
                       setDatePickerState({
                         isOpen: true,
                         mode: 'week',
-                        title: 'انتخاب تقویمی بازه هفتگی تحصیلی',
+                        title: 'انتخاب تقویمی تاریخ شروع برنامه هفتگی',
                       })
                     }
                     className="bg-white hover:bg-neutral-100 text-neutral-800 border border-neutral-300 px-2.5 py-1 rounded-lg text-[11px] font-bold flex items-center gap-1 transition shadow-2xs cursor-pointer"
@@ -2410,22 +2423,22 @@ export default function App() {
                 {/* Week Start with Calendar Icon */}
                 <div className="space-y-1">
                   <div className="flex items-center justify-between">
-                    <label className="font-bold text-neutral-700">شروع هفته:</label>
+                    <label className="font-bold text-neutral-700">شروع هفته (روز اول):</label>
                     <button
                       type="button"
                       onClick={() =>
                         setDatePickerState({
                           isOpen: true,
-                          mode: 'single',
+                          mode: 'week',
                           targetField: 'start',
-                          title: 'انتخاب تقویمی تاریخ شروع هفته',
+                          title: 'انتخاب تاریخ شروع برنامه هفتگی (تنظیم خودکار ۷ روز)',
                         })
                       }
                       className="text-[10.5px] text-[#FF4F12] hover:text-[#C93A00] flex items-center gap-1 font-bold cursor-pointer transition"
-                      title="انتخاب از تقویم شمسی"
+                      title="انتخاب تاریخ شروع و محاسبه خودکار روزهای هفته"
                     >
                       <Calendar className="w-3 h-3" />
-                      <span>تقویم</span>
+                      <span>تقویم هوشمند</span>
                     </button>
                   </div>
                   <div className="relative">
@@ -2433,7 +2446,7 @@ export default function App() {
                       type="text"
                       value={weekRange.start}
                       onChange={(e) => setWeekRange({ ...weekRange, start: e.target.value })}
-                      placeholder="شنبه ۲ آبان ۱۴۰۵"
+                      placeholder="مثال: دوشنبه ۱۲ آبان ۱۴۰۵"
                       className="w-full bg-white border border-neutral-300 rounded-xl p-2 pl-8 text-xs font-bold text-neutral-900 focus:ring-2 focus:ring-[#FF4F12] focus:outline-none"
                     />
                     <button
@@ -2441,13 +2454,13 @@ export default function App() {
                       onClick={() =>
                         setDatePickerState({
                           isOpen: true,
-                          mode: 'single',
+                          mode: 'week',
                           targetField: 'start',
-                          title: 'انتخاب تقویمی تاریخ شروع هفته',
+                          title: 'انتخاب تاریخ شروع برنامه هفتگی (تنظیم خودکار ۷ روز)',
                         })
                       }
                       className="absolute left-2.5 top-2.5 text-neutral-400 hover:text-[#FF4F12] transition cursor-pointer"
-                      title="انتخاب از تقویم شمسی"
+                      title="انتخاب تاریخ شروع از تقویم"
                     >
                       <Calendar className="w-3.5 h-3.5" />
                     </button>
@@ -2457,7 +2470,7 @@ export default function App() {
                 {/* Week End with Calendar Icon */}
                 <div className="space-y-1">
                   <div className="flex items-center justify-between">
-                    <label className="font-bold text-neutral-700">پایان هفته:</label>
+                    <label className="font-bold text-neutral-700">پایان هفته (روز هفتم):</label>
                     <button
                       type="button"
                       onClick={() =>
@@ -2480,7 +2493,7 @@ export default function App() {
                       type="text"
                       value={weekRange.end}
                       onChange={(e) => setWeekRange({ ...weekRange, end: e.target.value })}
-                      placeholder="جمعه ۸ آبان ۱۴۰۵"
+                      placeholder="مثال: یکشنبه ۱۸ آبان ۱۴۰۵"
                       className="w-full bg-white border border-neutral-300 rounded-xl p-2 pl-8 text-xs font-bold text-neutral-900 focus:ring-2 focus:ring-[#FF4F12] focus:outline-none"
                     />
                     <button
@@ -2623,9 +2636,16 @@ export default function App() {
                       {/* Day Header Bar */}
                       <div className="bg-neutral-100/80 px-4 py-3 flex flex-wrap items-center justify-between gap-3 border-b border-neutral-200">
                         <div className="flex items-center gap-3 flex-wrap">
-                          <span className="font-black text-sm text-neutral-900 bg-neutral-900 text-white px-3 py-1 rounded-lg">
-                            {day.name}
-                          </span>
+                          <div className="flex items-center gap-1.5 bg-neutral-900 text-white px-2.5 py-1 rounded-xl shadow-xs">
+                            <span className="text-[10px] text-neutral-400 font-bold">روز:</span>
+                            <input
+                              type="text"
+                              value={day.name}
+                              onChange={(e) => updateDayName(day.id, e.target.value)}
+                              className="font-black text-xs text-white bg-transparent w-20 text-center focus:outline-none focus:ring-1 focus:ring-[#FF4F12] rounded"
+                              title="نام روز هفته (برای ویرایش مستقیم کلیک کنید)"
+                            />
+                          </div>
                           
                           {/* Inline editable date string */}
                           <div className="flex items-center gap-1.5 bg-white border border-neutral-300 rounded-lg px-2 py-0.5 shadow-2xs">
@@ -3445,6 +3465,7 @@ export default function App() {
         onClose={() => setDatePickerState((prev) => ({ ...prev, isOpen: false }))}
         title={datePickerState.title}
         mode={datePickerState.mode}
+        targetField={datePickerState.targetField}
         onSelectDate={handleSelectSingleDate}
         onSelectWeek={handleSelectPersianWeek}
       />
