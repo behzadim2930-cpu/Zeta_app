@@ -1,0 +1,1065 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8">
+<title>برنامه هفتگی – {{ footer.institute }}</title>
+<style>
+@font-face {
+  font-family: 'Vazirmatn';
+  src: url('fonts/Vazirmatn-Regular.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+}
+@font-face {
+  font-family: 'Vazirmatn';
+  src: url('fonts/Vazirmatn-Medium.ttf') format('truetype');
+  font-weight: 500;
+  font-style: normal;
+}
+@font-face {
+  font-family: 'Vazirmatn';
+  src: url('fonts/Vazirmatn-SemiBold.ttf') format('truetype');
+  font-weight: 600;
+  font-style: normal;
+}
+@font-face {
+  font-family: 'Vazirmatn';
+  src: url('fonts/Vazirmatn-Bold.ttf') format('truetype');
+  font-weight: 700;
+  font-style: normal;
+}
+@font-face {
+  font-family: 'Vazirmatn';
+  src: url('fonts/Vazirmatn-ExtraBold.ttf') format('truetype');
+  font-weight: 800;
+  font-style: normal;
+}
+@font-face {
+  font-family: 'Vazirmatn';
+  src: url('fonts/Vazirmatn-Black.ttf') format('truetype');
+  font-weight: 900;
+  font-style: normal;
+}
+
+:root {
+  --o: #FF4F12;
+  --o-d: #C93A00;
+  --o-l: #FFF1EA;
+  --k: #111111;
+  --g: #6B6B6B;
+  --line: #E8E8E8;
+  --cream: #F6F3EF;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+body {
+  font-family: 'Vazirmatn', Tahoma, 'Segoe UI', sans-serif;
+  color: var(--k);
+  background: #fff;
+  font-size: 11.5px;
+  line-height: 1.7;
+  direction: rtl;
+}
+
+@page {
+  size: A4 portrait;
+  margin: 0;
+}
+
+.page {
+  width: 210mm;
+  height: 297mm;
+  max-height: 297mm;
+  margin: 0 auto;
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow: hidden;
+  page-break-after: always;
+  break-after: page;
+  box-sizing: border-box;
+}
+
+.body {
+  padding: 5mm 12mm 3mm;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+}
+
+/* Header */
+.hd {
+  background: var(--k);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 6mm 12mm 5mm;
+  border-bottom: 4px solid var(--o);
+}
+
+.logo {
+  width: 24mm;
+  height: 24mm;
+  background: #fff;
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+  flex: none;
+}
+
+.logo img {
+  max-width: 100%;
+  max-height: 100%;
+  display: block;
+}
+
+.ttl {
+  flex: 1;
+}
+
+.ttl h1 {
+  font-size: 30px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.bar-o {
+  width: 54px;
+  height: 4px;
+  background: var(--o);
+  border-radius: 4px;
+  margin: 8px 0 6px;
+}
+
+.sub {
+  font-size: 12px;
+  color: #bdbdbd;
+}
+
+.range {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 12px;
+  color: #fff;
+  border-right: 2px solid #333;
+  padding-right: 16px;
+  white-space: nowrap;
+}
+
+.range span:last-child {
+  color: #ffb79c;
+}
+
+.mini-hd {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6mm 12mm 3mm;
+  font-size: 10.5px;
+  color: var(--g);
+  border-bottom: 1px solid var(--line);
+  margin: 0 12mm;
+  padding-left: 0;
+  padding-right: 0;
+}
+
+.mini-hd .fb, .foot .fb {
+  font-weight: 800;
+  color: var(--k);
+}
+
+/* Info card */
+.info {
+  display: table;
+  width: 100%;
+  table-layout: fixed;
+  border: 1.5px solid var(--o);
+  border-radius: 14px;
+  overflow: hidden;
+  border-collapse: separate;
+  border-spacing: 0;
+  background: #fff;
+}
+
+.info .col {
+  display: table-cell;
+  width: 50%;
+  padding: 8px 12px;
+  vertical-align: top;
+}
+
+.info .col + .col {
+  border-right: 1px solid #ffd2bf;
+  background: var(--o-l);
+}
+
+.info .col-hd {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid #f0ece6;
+  padding-bottom: 4px;
+  margin-bottom: 5px;
+}
+
+.info .col + .col .col-hd {
+  border-bottom: 1px solid #ffd2bf;
+}
+
+.info .badge-tag {
+  font-size: 9.5px;
+  font-weight: 700;
+  background: #f6f3ef;
+  color: #444;
+  padding: 1px 7px;
+  border-radius: 20px;
+  border: 1px solid #e5ded4;
+}
+
+.info .col + .col .badge-tag {
+  background: #fff;
+  color: var(--o-d);
+  border-color: #ffd2bf;
+}
+
+.info .name-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 3px;
+}
+
+.info .name-lbl {
+  font-size: 10px;
+  font-weight: 700;
+  color: #999;
+  width: 38px;
+  flex-shrink: 0;
+}
+
+.info .col + .col .name-lbl {
+  color: #9e705b;
+}
+
+.info .name-val {
+  font-size: 15.5px;
+  font-weight: 900;
+  color: var(--k);
+  letter-spacing: normal;
+  line-height: 1.4;
+}
+
+.info .sub-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 10.5px;
+}
+
+.info .sub-lbl {
+  font-size: 10px;
+  font-weight: 700;
+  color: #999;
+  width: 38px;
+  flex-shrink: 0;
+}
+
+.info .col + .col .sub-lbl {
+  color: #9e705b;
+}
+
+.info .target-val {
+  font-weight: 700;
+  color: var(--o-d);
+  line-height: 1.35;
+}
+
+.info .date-val {
+  font-weight: 600;
+  color: #444;
+}
+
+/* Summary Card */
+.summary {
+  display: table;
+  width: 100%;
+  table-layout: fixed;
+  background: var(--cream);
+  border-radius: 14px;
+  padding: 10px 14px;
+  box-sizing: border-box;
+}
+
+.stats {
+  display: table-cell;
+  width: 135px;
+  vertical-align: middle;
+  padding-left: 12px;
+  border-left: 1px solid #e3ddd5;
+}
+
+.st {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.35;
+  padding-bottom: 5px;
+  border-bottom: 1px solid #e3ddd5;
+}
+
+.st:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.st b {
+  font-size: 19px;
+  font-weight: 800;
+}
+
+.st:first-child b {
+  color: var(--o);
+}
+
+.st span {
+  font-size: 10px;
+  color: var(--g);
+}
+
+.chart {
+  display: table-cell;
+  vertical-align: bottom;
+  height: 90px;
+  padding-right: 10px;
+}
+
+.chart-table {
+  display: table;
+  width: 100%;
+  height: 90px;
+  table-layout: fixed;
+}
+
+.bcol {
+  display: table-cell;
+  width: 14.28%;
+  vertical-align: bottom;
+  text-align: center;
+  height: 100%;
+}
+
+.bval {
+  font-size: 9.5px;
+  color: var(--g);
+  height: 15px;
+  line-height: 15px;
+  text-align: center;
+}
+
+.btrack {
+  height: 52px;
+  width: 100%;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.bar {
+  width: 60%;
+  background: var(--o);
+  border-radius: 6px 6px 2px 2px;
+  min-height: 3px;
+  margin: 0 auto;
+}
+
+.bar.zero {
+  background: #cfcac3;
+}
+
+.bname {
+  font-size: 9.5px;
+  font-weight: 600;
+  margin-top: 4px;
+  height: 16px;
+  line-height: 16px;
+  white-space: nowrap;
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  align-items: center;
+}
+
+/* Chips */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 9px 2px 10px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  white-space: nowrap;
+  line-height: 1.7;
+  border: 1px solid transparent;
+}
+
+.ic {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  flex: none;
+  vertical-align: middle;
+}
+
+.c-study { background: var(--o-l); color: var(--o-d); }
+.c-review { background: var(--cream); color: #444; border-color: #e3ddd5; }
+.c-test { background: var(--k); color: #fff; }
+.c-video { background: #fff; color: var(--o-d); border-color: var(--o); }
+.c-exam { background: var(--o); color: #fff; }
+.c-summary { background: #fff; color: var(--k); border-color: var(--k); }
+.c-doubt { background: var(--line); color: var(--k); }
+.c-rest { background: var(--cream); color: #444; border-color: #e3ddd5; }
+
+/* Day Card */
+.day {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  overflow: hidden;
+  page-break-inside: avoid !important;
+  break-inside: avoid !important;
+  -webkit-column-break-inside: avoid !important;
+}
+
+.day-h {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: var(--cream);
+  padding: 6px 14px;
+  border-bottom: 2px solid var(--k);
+}
+
+.dn {
+  font-size: 14px;
+  font-weight: 900;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.dd {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--o-d);
+  background: #fff;
+  padding: 1px 7px;
+  border-radius: 6px;
+  border: 1px solid #e5dfd7;
+}
+
+.tot {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+}
+
+.tot b {
+  font-size: 15px;
+  font-weight: 900;
+  color: var(--o);
+}
+
+.lbl {
+  font-size: 10px;
+  color: var(--g);
+}
+
+.row {
+  display: block;
+  padding: 6px 14px;
+  border-bottom: 1px solid var(--line);
+  page-break-inside: avoid !important;
+  break-inside: avoid !important;
+  -webkit-column-break-inside: avoid !important;
+}
+
+.row:nth-of-type(even) {
+  background: #FCFAF8;
+}
+
+.row:last-child {
+  border-bottom: 0;
+}
+
+.row-main-bar {
+  display: table;
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+}
+
+.r-type {
+  display: table-cell;
+  width: 118px;
+  vertical-align: middle;
+}
+
+.r-main {
+  display: table-cell;
+  vertical-align: middle;
+  padding: 0 10px;
+  text-align: right;
+}
+
+.subj {
+  font-weight: 800;
+  font-size: 12px;
+  line-height: 1.4;
+  color: #111;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.topic {
+  font-size: 10.8px;
+  line-height: 1.4;
+  color: #444;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.r-time {
+  display: table-cell;
+  width: 126px;
+  vertical-align: middle;
+  text-align: left;
+}
+
+.r-time .t {
+  font-weight: 700;
+  font-size: 11.5px;
+  line-height: 1.3;
+  white-space: nowrap;
+}
+
+.r-time .d {
+  font-size: 9.8px;
+  color: var(--g);
+  line-height: 1.3;
+}
+
+.r-extra {
+  display: table-cell;
+  width: 60px;
+  vertical-align: middle;
+  text-align: left;
+}
+
+.extra {
+  display: inline-block;
+  font-size: 9.8px;
+  font-weight: 700;
+  color: var(--o-d);
+  background: var(--o-l);
+  border-radius: 6px;
+  padding: 1px 7px;
+  white-space: nowrap;
+}
+
+.note {
+  width: 100%;
+  margin-top: 4px;
+  padding: 2px 10px 2px 0;
+  border-right: 2px solid var(--o);
+  font-size: 10.3px;
+  color: #555;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  line-height: 1.6;
+}
+
+.subj {
+  font-weight: 900;
+  font-size: 12.5px;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  line-height: 1.45;
+}
+
+.topic {
+  font-size: 11px;
+  color: #3e3e3e;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  font-weight: 500;
+  line-height: 1.45;
+}
+
+.r-time {
+  width: 128px;
+  flex-shrink: 0;
+}
+
+.r-time .t {
+  font-weight: 700;
+  font-size: 11.5px;
+  white-space: nowrap;
+}
+
+.r-time .d {
+  font-size: 9.8px;
+  color: var(--g);
+}
+
+.r-extra {
+  width: 62px;
+  flex-shrink: 0;
+  text-align: left;
+}
+
+.extra {
+  display: inline-block;
+  font-size: 9.8px;
+  font-weight: 700;
+  color: var(--o-d);
+  background: var(--o-l);
+  border-radius: 6px;
+  padding: 0 7px;
+  white-space: nowrap;
+}
+
+.note {
+  width: 100%;
+  margin-top: 3px;
+  padding: 1px 10px 1px 0;
+  border-right: 2px solid var(--o);
+  font-size: 10.3px;
+  color: #555;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  line-height: 1.75;
+  margin-right: 2px;
+}
+
+.rest-day .day-h {
+  border-bottom-width: 1px;
+}
+
+.rest-body {
+  padding: 9px 14px;
+  font-size: 10.8px;
+  color: var(--g);
+}
+
+/* Goals + Tracker */
+h2 {
+  font-size: 13px;
+  font-weight: 800;
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+h2::before {
+  content: "";
+  width: 5px;
+  height: 15px;
+  background: var(--o);
+  border-radius: 3px;
+}
+
+.goals {
+  background: var(--o-l);
+  border-radius: 14px;
+  padding: 11px 16px;
+  page-break-inside: avoid;
+  break-inside: avoid;
+}
+
+.gtxt p {
+  font-size: 11px;
+  line-height: 1.95;
+  color: #2b2b2b;
+}
+
+.gtxt p + p {
+  margin-top: 5px;
+}
+
+.track {
+  page-break-inside: avoid;
+  break-inside: avoid;
+}
+
+.track table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.track th {
+  background: var(--k);
+  color: #fff;
+  font-size: 10.3px;
+  font-weight: 700;
+  padding: 5px 8px;
+  text-align: center;
+}
+
+.track td {
+  border-top: 1px solid var(--line);
+  text-align: center;
+  padding: 4px 8px;
+  height: 23px;
+}
+
+.track tbody tr:nth-child(even) td {
+  background: #FCFAF8;
+}
+
+.td-d {
+  font-weight: 700;
+  width: 70px;
+  text-align: right !important;
+}
+
+.td-n {
+  width: 38%;
+}
+
+.box {
+  display: inline-block;
+  width: 13px;
+  height: 13px;
+  border: 1.5px solid var(--k);
+  border-radius: 4px;
+  vertical-align: middle;
+}
+
+/* Footer */
+.foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 0 12mm;
+  padding: 6px 0 6mm;
+  border-top: 1.5px solid var(--o);
+  font-size: 10px;
+  color: var(--g);
+  margin-top: auto;
+}
+</style>
+</head>
+<body>
+
+<!-- ============ صفحه ۱ ============ -->
+<div class="page">
+  <header class="hd">
+    <div class="logo">
+      {% if logo_base64 %}
+      <img src="{{ logo_base64 }}" alt="{{ footer.institute }}">
+      {% else %}
+      <b style="color:var(--o);font-size:22px;">Zeta</b>
+      {% endif %}
+    </div>
+    <div class="ttl">
+      <h1>برنامه هفتگی</h1>
+      <div class="bar-o"></div>
+      <div class="sub">موسسه آموزشی زتا</div>
+    </div>
+    <div class="range">
+      <span>از {{ week_range.start_date_str }}</span>
+      <span>تا {{ week_range.end_date_str }}</span>
+    </div>
+  </header>
+
+  <main class="body">
+    <section class="info">
+      <div class="col">
+        <div class="col-hd">
+          <h3 style="margin:0;font-size:11px;font-weight:900;color:var(--o-d);display:flex;align-items:center;gap:6px;"><span style="width:7px;height:7px;border-radius:50%;background:var(--o);display:inline-block;"></span>مشخصات دانش‌آموز</h3>
+          <span class="badge-tag">{{ student.grade_and_field }}</span>
+        </div>
+        <div class="name-row">
+          <span class="name-lbl">نام:</span>
+          <span class="name-val">{{ student.name }}</span>
+        </div>
+        <div class="sub-row">
+          <span class="sub-lbl">هدف:</span>
+          <span class="target-val">🎯 {{ student.target }}</span>
+        </div>
+      </div>
+      <div class="col">
+        <div class="col-hd">
+          <h3 style="margin:0;font-size:11px;font-weight:900;color:var(--o-d);display:flex;align-items:center;gap:6px;"><span style="width:7px;height:7px;border-radius:50%;background:var(--o);display:inline-block;"></span>مشاور تحصیلی و برنامه‌ریز</h3>
+          <span class="badge-tag">{{ advisor.week_title }}</span>
+        </div>
+        <div class="name-row">
+          <span class="name-lbl">مشاور:</span>
+          <span class="name-val">{{ advisor.name }}</span>
+        </div>
+        <div class="sub-row">
+          <span class="sub-lbl">تنظیم:</span>
+          <span class="date-val">📅 {{ advisor.created_date }}</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="summary">
+      <div class="stats">
+        <div class="st"><b>{{ summary.total_hours_str }}</b><span>ساعت کل هفته</span></div>
+        <div class="st"><b>{{ summary.active_days_count }}</b><span>روز فعال</span></div>
+        <div class="st"><b>{{ summary.daily_avg_str }}</b><span>میانگین روزانه</span></div>
+      </div>
+      <div class="chart">
+        <div class="chart-table">
+          {% for bar in chart_bars %}
+          <div class="bcol">
+            <div class="bval">{{ bar.val_str }}</div>
+            <div class="btrack">
+              <div class="bar{% if bar.is_zero %} zero{% endif %}" style="height:{{ bar.height_pct }}%"></div>
+            </div>
+            <div class="bname">{{ bar.day_name }}</div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </section>
+
+    <div class="legend">
+      {% for item in legend_items %}
+      <span class="chip {{ item.css_class }}">
+        {{ item.icon_svg|safe }}
+        <span>{{ item.title }}</span>
+      </span>
+      {% endfor %}
+    </div>
+
+    {% for day in page1_days %}
+    {% if day.is_rest %}
+    <section class="day rest-day">
+      <div class="day-h">
+        <div class="dn">{{ day.name }}<span class="dd">{{ day.date_str }}</span></div>
+        <span class="chip c-rest">{{ rest_icon_svg|safe }}<span>روز استراحت</span></span>
+      </div>
+      <div class="rest-body">{{ day.rest_text }}</div>
+    </section>
+    {% else %}
+    <section class="day">
+      <div class="day-h">
+        <div class="dn">{{ day.name }}<span class="dd">{{ day.date_str }}</span></div>
+        <div class="tot"><span class="lbl">جمع امروز</span><b>{{ day.total_hours_str }}</b><span class="lbl">ساعت</span></div>
+      </div>
+      {% for b in day.blocks %}
+      <div class="row">
+        <div class="row-main-bar">
+          <div class="r-type">
+            <span class="chip {{ b.css_class }}">{{ b.icon_svg|safe }}<span>{{ b.type_title }}</span></span>
+          </div>
+          <div class="r-main">
+            <div class="subj">{{ b.subject }}</div>
+            <div class="topic">{{ b.topic }}</div>
+          </div>
+          <div class="r-time">
+            <div class="t">{{ b.time_range }}</div>
+            <div class="d">{{ b.duration_str }}</div>
+          </div>
+          <div class="r-extra">
+            {% if b.extra %}<span class="extra">{{ b.extra }}</span>{% endif %}
+          </div>
+        </div>
+        {% if b.note %}
+        <div class="note">{{ b.note }}</div>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </section>
+    {% endif %}
+    {% endfor %}
+  </main>
+  <footer class="foot">
+    <span class="fb">{{ footer.institute }}</span>
+    <span>صفحه ۱ از {{ total_pages }}</span>
+    <span>{{ footer.setting_date }}</span>
+  </footer>
+</div>
+
+<!-- ============ صفحه ۲ ============ -->
+<div class="page">
+  <div class="mini-hd">
+    <div style="display:flex;align-items:center;gap:6px;">
+      <span class="fb">{{ footer.institute }}</span>
+      <span style="font-size:9.5px;font-weight:700;background:var(--o);color:#fff;padding:1px 6px;border-radius:10px;">برنامه اختصاصی</span>
+    </div>
+    <span>دانش‌آموز: <strong style="font-size:12.5px;font-weight:900;color:var(--k);">{{ student.name }}</strong> · {{ week_range.start_date_str }} تا {{ week_range.end_date_str }}</span>
+  </div>
+  <main class="body">
+    {% for day in page2_days %}
+    {% if day.is_rest %}
+    <section class="day rest-day">
+      <div class="day-h">
+        <div class="dn">{{ day.name }}<span class="dd">{{ day.date_str }}</span></div>
+        <span class="chip c-rest">{{ rest_icon_svg|safe }}<span>روز استراحت</span></span>
+      </div>
+      <div class="rest-body">{{ day.rest_text }}</div>
+    </section>
+    {% else %}
+    <section class="day">
+      <div class="day-h">
+        <div class="dn">{{ day.name }}<span class="dd">{{ day.date_str }}</span></div>
+        <div class="tot"><span class="lbl">جمع امروز</span><b>{{ day.total_hours_str }}</b><span class="lbl">ساعت</span></div>
+      </div>
+      {% for b in day.blocks %}
+      <div class="row">
+        <div class="row-main-bar">
+          <div class="r-type">
+            <span class="chip {{ b.css_class }}">{{ b.icon_svg|safe }}<span>{{ b.type_title }}</span></span>
+          </div>
+          <div class="r-main">
+            <div class="subj">{{ b.subject }}</div>
+            <div class="topic">{{ b.topic }}</div>
+          </div>
+          <div class="r-time">
+            <div class="t">{{ b.time_range }}</div>
+            <div class="d">{{ b.duration_str }}</div>
+          </div>
+          <div class="r-extra">
+            {% if b.extra %}<span class="extra">{{ b.extra }}</span>{% endif %}
+          </div>
+        </div>
+        {% if b.note %}
+        <div class="note">{{ b.note }}</div>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </section>
+    {% endif %}
+    {% endfor %}
+  </main>
+  <footer class="foot">
+    <span class="fb">{{ footer.institute }}</span>
+    <span>صفحه ۲ از {{ total_pages }}</span>
+    <span>{{ footer.setting_date }}</span>
+  </footer>
+</div>
+
+<!-- ============ صفحه ۳ ============ -->
+<div class="page">
+  <div class="mini-hd">
+    <div style="display:flex;align-items:center;gap:6px;">
+      <span class="fb">{{ footer.institute }}</span>
+      <span style="font-size:9.5px;font-weight:700;background:var(--o);color:#fff;padding:1px 6px;border-radius:10px;">برنامه اختصاصی</span>
+    </div>
+    <span>دانش‌آموز: <strong style="font-size:12.5px;font-weight:900;color:var(--k);">{{ student.name }}</strong> · {{ week_range.start_date_str }} تا {{ week_range.end_date_str }}</span>
+  </div>
+  <main class="body">
+    {% for day in page3_days %}
+    {% if day.is_rest %}
+    <section class="day rest-day">
+      <div class="day-h">
+        <div class="dn">{{ day.name }}<span class="dd">{{ day.date_str }}</span></div>
+        <span class="chip c-rest">{{ rest_icon_svg|safe }}<span>روز استراحت</span></span>
+      </div>
+      <div class="rest-body">{{ day.rest_text }}</div>
+    </section>
+    {% else %}
+    <section class="day">
+      <div class="day-h">
+        <div class="dn">{{ day.name }}<span class="dd">{{ day.date_str }}</span></div>
+        <div class="tot"><span class="lbl">جمع امروز</span><b>{{ day.total_hours_str }}</b><span class="lbl">ساعت</span></div>
+      </div>
+      {% for b in day.blocks %}
+      <div class="row">
+        <div class="row-main-bar">
+          <div class="r-type">
+            <span class="chip {{ b.css_class }}">{{ b.icon_svg|safe }}<span>{{ b.type_title }}</span></span>
+          </div>
+          <div class="r-main">
+            <div class="subj">{{ b.subject }}</div>
+            <div class="topic">{{ b.topic }}</div>
+          </div>
+          <div class="r-time">
+            <div class="t">{{ b.time_range }}</div>
+            <div class="d">{{ b.duration_str }}</div>
+          </div>
+          <div class="r-extra">
+            {% if b.extra %}<span class="extra">{{ b.extra }}</span>{% endif %}
+          </div>
+        </div>
+        {% if b.note %}
+        <div class="note">{{ b.note }}</div>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </section>
+    {% endif %}
+    {% endfor %}
+
+    <section class="goals">
+      <h2>اهداف و توصیه‌های مشاور</h2>
+      <div class="gtxt">
+        {% for para in goals_paragraphs %}
+        <p>{{ para }}</p>
+        {% endfor %}
+      </div>
+    </section>
+
+    <section class="track">
+      <h2>پیگیری هفتگی</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>روز</th>
+            <th>انجام شد</th>
+            <th>نیمه‌کاره</th>
+            <th>انجام نشد</th>
+            <th>یادداشت</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for day in all_days %}
+          <tr>
+            <td class="td-d">{{ day.name }}</td>
+            <td><i class="box"></i></td>
+            <td><i class="box"></i></td>
+            <td><i class="box"></i></td>
+            <td class="td-n"></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </section>
+  </main>
+  <footer class="foot">
+    <span class="fb">{{ footer.institute }}</span>
+    <span>صفحه ۳ از {{ total_pages }}</span>
+    <span>{{ footer.setting_date }}</span>
+  </footer>
+</div>
+
+</body>
+</html>

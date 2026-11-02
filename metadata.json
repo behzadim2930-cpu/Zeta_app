@@ -1,0 +1,6 @@
+{
+  "name": "Zeta Telegram Bot & Weekly Plan PDF Generator",
+  "description": "سامانه هوشمند ورود برنامه هفتگی دانش‌آموزان توسط مشاوران با ویرایشگر کامل پارت‌های درسی و صدور مستقیم فایل PDF استاندارد A4 و ارسال به تلگرام بدون نیاز به سرور.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

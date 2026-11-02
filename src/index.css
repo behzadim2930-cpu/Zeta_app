@@ -1,0 +1,92 @@
+@import "tailwindcss";
+
+@page {
+  size: A4 portrait;
+  margin: 0;
+}
+
+/* ========================================================
+   قوانین سراسری فونت فارسی و جلوگیری از در هم رفتن حروف در PDF
+   حذف کامل فاصله‌گذاری منفی حروف (letter-spacing: normal) برای رندر بدون باگ
+   ======================================================== */
+*, *::before, *::after {
+  letter-spacing: normal !important;
+}
+
+body, button, input, select, textarea {
+  font-family: 'Vazirmatn', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+  direction: rtl;
+  letter-spacing: normal !important;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.print-page {
+  font-family: 'Vazirmatn', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+  direction: rtl !important;
+  letter-spacing: normal !important;
+}
+
+.print-page * {
+  letter-spacing: normal !important;
+}
+
+/* ========================================================
+   قوانین صریح break-inside: avoid برای کارت‌های روز و بلوک‌ها
+   جهت جلوگیری از تکه‌تکه شدن متن و شکستن ناخواسته در بین صفحات PDF
+   ======================================================== */
+.day,
+.day-card,
+[data-day-card="true"],
+.page-break-avoid,
+.break-inside-avoid {
+  break-inside: avoid !important;
+  page-break-inside: avoid !important;
+  -webkit-column-break-inside: avoid !important;
+}
+
+.block-row {
+  break-inside: avoid !important;
+  page-break-inside: avoid !important;
+  -webkit-column-break-inside: avoid !important;
+}
+
+.card-avoid-break {
+  break-inside: avoid !important;
+  page-break-inside: avoid !important;
+}
+
+/* Print Specific Rules */
+@media print {
+  html, body {
+    background: #ffffff !important;
+    color: #111111 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  header, nav, .no-print, button, input {
+    display: none !important;
+  }
+  .print-page {
+    display: flex !important;
+    position: relative !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 210mm !important;
+    height: 297mm !important;
+    max-height: 297mm !important;
+    page-break-after: always !important;
+    break-after: page !important;
+    overflow: hidden !important;
+    margin: 0 auto !important;
+    box-sizing: border-box !important;
+  }
+  .day,
+  .day-card {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+}
+
