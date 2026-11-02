@@ -229,7 +229,7 @@ export default function App() {
   const [isSendingTelegram, setIsSendingTelegram] = useState<boolean>(false);
   const [telegramSendResult, setTelegramSendResult] = useState<{ success: boolean; message: string } | null>(null);
   const [copiedUrl, setCopiedUrl] = useState<boolean>(false);
-  const [bypassWorkerUrl, setBypassWorkerUrl] = useState<string>(() => localStorage.getItem('zeta_bypass_url') || '');
+  const [bypassWorkerUrl, setBypassWorkerUrl] = useState<string>(() => localStorage.getItem('zeta_bypass_url') || 'https://zeta-app.ketabkhan1234ketab.workers.dev/');
   const [isUpdatingMenuUrl, setIsUpdatingMenuUrl] = useState<boolean>(false);
   const [updateUrlResult, setUpdateUrlResult] = useState<{ success: boolean; message: string } | null>(null);
   const [copiedWorkerCode, setCopiedWorkerCode] = useState<boolean>(false);

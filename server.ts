@@ -32,7 +32,7 @@ app.get('/api/telegram/getMe', async (req, res) => {
   }
 });
 
-let currentWebappUrl = process.env.PUBLIC_WEBAPP_URL || 'https://ais-pre-sc62ancbog6atlg2ssl57i-512949655823.europe-west3.run.app';
+let currentWebappUrl = process.env.PUBLIC_WEBAPP_URL || 'https://zeta-app.ketabkhan1234ketab.workers.dev/';
 
 // Get current active Telegram WebApp URL
 app.get('/api/telegram/getMenuUrl', (req, res) => {
