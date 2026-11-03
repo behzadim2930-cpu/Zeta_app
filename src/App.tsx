@@ -602,21 +602,23 @@ export default function App() {
   }
 
   /**
-   * تابع کمکی جهت محاسبه دقیق ارتفاع هر بلوک بر حسب پیکسل
-   * با در نظر گرفتن ارتفاع ردیف، نوع فعالیت، خطوط مبحث و یادداشت‌های مشاور
+   * تابع کمکی جهت محاسبه دقیق ارتفاع هر بلوک بر حسب پیکسل در برگه فیزیکی A4
+   * با در نظر گرفتن ارتفاع پایه ردیف (۴۴ پیکسل)، خطوط طولانی مبحث و یادداشت‌های مشاور
    */
   const calculateBlockHeight = (block: Block): number => {
-    let height = 38;
+    let height = 44; // ارتفاع پایه ردیف با پدینگ عمودی و فونت استاندارد
     const topicLen = (block.topic || '').trim().length;
-    const estimatedTopicLines = Math.max(1, Math.ceil(topicLen / 36));
-    height += (estimatedTopicLines - 1) * 16;
+    if (topicLen > 28) {
+      const extraTopicLines = Math.ceil((topicLen - 28) / 28);
+      height += extraTopicLines * 16;
+    }
     if (block.extra && block.extra.trim()) {
       height += 2;
     }
     if (block.note && block.note.trim()) {
       const noteLen = block.note.trim().length;
-      const estimatedNoteLines = Math.max(1, Math.ceil(noteLen / 50));
-      height += 12 + (estimatedNoteLines * 18);
+      const noteLines = Math.max(1, Math.ceil(noteLen / 45));
+      height += 6 + (noteLines * 17);
     }
     return Math.ceil(height);
   };
@@ -624,11 +626,14 @@ export default function App() {
   /**
    * تابع کمکی برای محاسبه دقیق ارتفاع کارت یک روز
    */
-  const calculateDayHeight = (day: DayPlan): number => {
+  const calculateDayHeight = (day: DayPlan | PageSection): number => {
     if (day.isRest) {
-      return 92;
+      return 74; // کارت روز استراحت با پیام انگیزشی
     }
-    let total = 42; // header height
+    if (day.blocks.length === 0) {
+      return 58; // کارت روز خالی
+    }
+    let total = 36; // ارتفاع هدر کارت روز به همراه بوردرها
     for (const block of day.blocks) {
       total += calculateBlockHeight(block);
     }
@@ -636,26 +641,55 @@ export default function App() {
   };
 
   /**
-   * الگوریتم هوشمند صفحه‌بندی داینامیک:
-   * با افزایش تعداد پارت‌ها، صفحات به‌صورت کاملاً خودکار و بدون درهم‌ریختگی یا تداخل متون
-   * به تعداد مورد نیاز اضافه می‌شوند و با کم شدن پارت‌ها، صفحات کاهش می‌یابند.
+   * الگوریتم هوشمند صفحه‌بندی داینامیک و ضد سرریز A4:
+   * ارتفاع فیزیکی A4 برابر ۱۱۲۳ پیکسل است.
+   * هدر اصلی، مشخصات دانش‌آموز، نمودار و راهنما در صفحه اول حدود ۳۹۶ پیکسل فضا دارند (بودجه امن روزها: ۵۴۰ پیکسل).
+   * در صفحات بعدی هدر مختصر است و بودجه امن روزها معادل ۸۸۰ پیکسل است.
+   * بخش اهداف و جدول ارزیابی به ۳۳۰ پیکسل فضا نیاز دارد.
    */
   const dynamicPages = useMemo<DynamicPage[]>(() => {
-    // ارتفاع مفید A4 در مقیاس استاندارد:
-    // صفحه اول به دلیل داشتن هدر اصلی، مشخصات، نمودار ستونی و راهنما، فضای روزانه معادل ۵۲۰ پیکسل دارد.
-    // صفحات بعدی با هدر مختصر، فضای روزانه‌ای معادل ۹۲۰ پیکسل دارند.
-    // بخش اهداف و جدول ارزیابی به حدود ۳۸۰ پیکسل فضا نیاز دارد.
-    const PAGE1_DAYS_BUDGET = 520;
-    const SUBSEQUENT_PAGE_BUDGET = 920;
-    const GOALS_TRACKER_HEIGHT = 380;
+    const PAGE1_DAYS_BUDGET = 540;
+    const SUBSEQUENT_PAGE_BUDGET = 880;
+    const GOALS_TRACKER_HEIGHT = 330;
 
-    // ۱. تبدیل روزها به بخش‌های متناسب (در صورت سنگین بودن بیش از حد یک روز، پارت‌ها بدون شکستگی تقسیم می‌شوند)
-    const rawSections: PageSection[] = [];
+    const pages: DynamicPage[] = [];
+    let currentPageNum = 1;
+    let isFirstPage = true;
+    let currentSections: PageSection[] = [];
+    let currentHeight = 0;
+    let currentBudget = PAGE1_DAYS_BUDGET;
 
-    days.forEach((day) => {
+    const finalizeCurrentPage = (hasGoals: boolean) => {
+      const dayNames = currentSections.map((s) => s.dayName).join('، ');
+      pages.push({
+        pageNumber: currentPageNum,
+        isFirstPage,
+        title: hasGoals 
+          ? (currentSections.length > 0 ? `صفحه ${currentPageNum} (${dayNames} + اهداف)` : `صفحه ${currentPageNum} (اهداف و ارزیابی)`)
+          : `صفحه ${currentPageNum} (${dayNames || 'برنامه'})`,
+        sections: currentSections,
+        hasGoalsAndTracker: hasGoals,
+        estimatedHeight: currentHeight + (hasGoals ? GOALS_TRACKER_HEIGHT : 0),
+      });
+      currentPageNum++;
+      isFirstPage = false;
+      currentBudget = SUBSEQUENT_PAGE_BUDGET;
+      currentSections = [];
+      currentHeight = 0;
+    };
+
+    // پیمایش ترتیبی تمام روزهای هفته
+    for (let dayIdx = 0; dayIdx < days.length; dayIdx++) {
+      const day = days[dayIdx];
       const dayMins = calculateTotalMinutes(day);
+
       if (day.isRest) {
-        rawSections.push({
+        const secHeight = 74;
+        const gap = currentSections.length > 0 ? 8 : 0;
+        if (currentHeight + gap + secHeight > currentBudget && currentSections.length > 0) {
+          finalizeCurrentPage(false);
+        }
+        currentSections.push({
           dayId: day.id,
           dayName: day.name,
           dateStr: day.dateStr,
@@ -665,8 +699,17 @@ export default function App() {
           totalDayMinutes: 0,
           totalDayBlocks: 0,
         });
-      } else if (day.blocks.length === 0) {
-        rawSections.push({
+        currentHeight += (currentSections.length > 1 ? 8 : 0) + secHeight;
+        continue;
+      }
+
+      if (day.blocks.length === 0) {
+        const secHeight = 58;
+        const gap = currentSections.length > 0 ? 8 : 0;
+        if (currentHeight + gap + secHeight > currentBudget && currentSections.length > 0) {
+          finalizeCurrentPage(false);
+        }
+        currentSections.push({
           dayId: day.id,
           dayName: day.name,
           dateStr: day.dateStr,
@@ -675,141 +718,93 @@ export default function App() {
           totalDayMinutes: 0,
           totalDayBlocks: 0,
         });
-      } else {
-        const dayTotalHeight = calculateDayHeight(day);
-        // اگر پارت‌های یک روز بسیار زیاد باشد (>820 پیکسل)، آن روز را به دو کارت (ادامه‌دار) می‌شکنیم
-        if (dayTotalHeight > 820) {
-          let currentChunk: Block[] = [];
-          let currentChunkHeight = 42;
-          let chunkIndex = 1;
+        currentHeight += (currentSections.length > 1 ? 8 : 0) + secHeight;
+        continue;
+      }
 
-          day.blocks.forEach((b) => {
-            const bh = calculateBlockHeight(b);
-            if (currentChunkHeight + bh > 800 && currentChunk.length > 0) {
-              rawSections.push({
-                dayId: day.id,
-                dayName: chunkIndex === 1 ? day.name : `${day.name} (ادامه)`,
-                dateStr: day.dateStr,
-                isRest: false,
-                isContinued: chunkIndex > 1,
-                blocks: currentChunk,
-                totalDayMinutes: dayMins,
-                totalDayBlocks: day.blocks.length,
-              });
-              chunkIndex++;
-              currentChunk = [b];
-              currentChunkHeight = 42 + bh;
-            } else {
-              currentChunk.push(b);
-              currentChunkHeight += bh;
-            }
+      // روز دارای پارت‌های درسی
+      let remainingBlocks = [...day.blocks];
+      let chunkIndex = 1;
+
+      while (remainingBlocks.length > 0) {
+        const gap = currentSections.length > 0 ? 8 : 0;
+        const availableHeight = currentBudget - currentHeight - gap;
+
+        // محاسبه کل ارتفاع پارت‌های باقیمانده این روز
+        let fullDayHeight = 36;
+        for (const b of remainingBlocks) {
+          fullDayHeight += calculateBlockHeight(b);
+        }
+
+        // اگر کل پارت‌ها در فضای باقیمانده جا می‌شوند:
+        if (fullDayHeight <= availableHeight) {
+          currentSections.push({
+            dayId: day.id,
+            dayName: chunkIndex === 1 ? day.name : `${day.name} (ادامه)`,
+            dateStr: day.dateStr,
+            isRest: false,
+            isContinued: chunkIndex > 1,
+            blocks: remainingBlocks,
+            totalDayMinutes: dayMins,
+            totalDayBlocks: day.blocks.length,
           });
+          currentHeight += gap + fullDayHeight;
+          remainingBlocks = [];
+        } else {
+          // در فضای باقیمانده جا نمی‌شود:
+          // اگر صفحه جاری قبلاً روزهایی دارد و فضای باقیمانده کمتر از ۱۶۰ پیکسل است، تمیزتر است صفحه بعدی شروع شود:
+          if (currentSections.length > 0 && availableHeight < 160) {
+            finalizeCurrentPage(false);
+            continue;
+          }
 
-          if (currentChunk.length > 0) {
-            rawSections.push({
+          // پارت‌هایی که در فضای موجود جا می‌گیرند را جدا می‌کنیم:
+          let chunkBlocks: Block[] = [];
+          let chunkH = 36;
+          for (let bi = 0; bi < remainingBlocks.length; bi++) {
+            const bh = calculateBlockHeight(remainingBlocks[bi]);
+            if (chunkH + bh <= availableHeight) {
+              chunkBlocks.push(remainingBlocks[bi]);
+              chunkH += bh;
+            } else {
+              break;
+            }
+          }
+
+          if (chunkBlocks.length > 0) {
+            currentSections.push({
               dayId: day.id,
               dayName: chunkIndex === 1 ? day.name : `${day.name} (ادامه)`,
               dateStr: day.dateStr,
               isRest: false,
               isContinued: chunkIndex > 1,
-              blocks: currentChunk,
+              blocks: chunkBlocks,
               totalDayMinutes: dayMins,
               totalDayBlocks: day.blocks.length,
             });
+            currentHeight += gap + chunkH;
+            remainingBlocks = remainingBlocks.slice(chunkBlocks.length);
+            chunkIndex++;
+            finalizeCurrentPage(false);
+          } else {
+            finalizeCurrentPage(false);
           }
-        } else {
-          rawSections.push({
-            dayId: day.id,
-            dayName: day.name,
-            dateStr: day.dateStr,
-            isRest: false,
-            blocks: day.blocks,
-            totalDayMinutes: dayMins,
-            totalDayBlocks: day.blocks.length,
-          });
         }
-      }
-    });
-
-    // تابع محاسبه ارتفاع کارت هر بخش
-    const getSectionHeight = (s: PageSection): number => {
-      if (s.isRest) return 92;
-      if (s.blocks.length === 0) return 72;
-      let h = 42;
-      for (const b of s.blocks) {
-        h += calculateBlockHeight(b);
-      }
-      return h;
-    };
-
-    // ۲. توزیع کارت‌های روزها در صفحات داینامیک
-    const pages: DynamicPage[] = [];
-    let currentPageNum = 1;
-    let isFirstPage = true;
-    let currentSections: PageSection[] = [];
-    let currentHeight = 0;
-    let currentBudget = PAGE1_DAYS_BUDGET;
-
-    for (let i = 0; i < rawSections.length; i++) {
-      const sec = rawSections[i];
-      const secHeight = getSectionHeight(sec);
-      const gap = currentSections.length > 0 ? 10 : 0;
-
-      if (currentSections.length === 0) {
-        currentSections.push(sec);
-        currentHeight = secHeight;
-      } else if (currentHeight + gap + secHeight <= currentBudget) {
-        currentSections.push(sec);
-        currentHeight += gap + secHeight;
-      } else {
-        // صفحه جاری تکمیل شد؛ ذخیره و شروع صفحه بعدی
-        const dayNames = currentSections.map((s) => s.dayName).join('، ');
-        pages.push({
-          pageNumber: currentPageNum,
-          isFirstPage,
-          title: `صفحه ${currentPageNum} (${dayNames})`,
-          sections: currentSections,
-          hasGoalsAndTracker: false,
-          estimatedHeight: currentHeight,
-        });
-
-        currentPageNum++;
-        isFirstPage = false;
-        currentBudget = SUBSEQUENT_PAGE_BUDGET;
-        currentSections = [sec];
-        currentHeight = secHeight;
       }
     }
 
-    // ۳. جانمایی بخش اهداف و جدول ارزیابی هفتگی
+    // بررسی جانمایی بخش اهداف و جدول ارزیابی
     if (currentSections.length > 0) {
       const remainingSpace = currentBudget - currentHeight - 12;
 
-      // اگر در صفحه بعدی (غیر از صفحه اول) بودیم و فضای کافی برای اهداف و جدول وجود داشت:
-      if (!isFirstPage && remainingSpace >= GOALS_TRACKER_HEIGHT) {
-        const dayNames = currentSections.map((s) => s.dayName).join('، ');
-        pages.push({
-          pageNumber: currentPageNum,
-          isFirstPage,
-          title: `صفحه ${currentPageNum} (${dayNames} + اهداف)`,
-          sections: currentSections,
-          hasGoalsAndTracker: true,
-          estimatedHeight: currentHeight + 12 + GOALS_TRACKER_HEIGHT,
-        });
+      // اگر در صفحه جاری فضای کافی (حداقل ۳۳۰ پیکسل) وجود داشته باشد:
+      if (remainingSpace >= GOALS_TRACKER_HEIGHT) {
+        finalizeCurrentPage(true);
       } else {
-        // صفحه جاری را فقط با روزها نهایی می‌کنیم
-        const dayNames = currentSections.map((s) => s.dayName).join('، ');
-        pages.push({
-          pageNumber: currentPageNum,
-          isFirstPage,
-          title: `صفحه ${currentPageNum} (${dayNames})`,
-          sections: currentSections,
-          hasGoalsAndTracker: false,
-          estimatedHeight: currentHeight,
-        });
+        // صفحه فعلی با روزها بسته می‌شود
+        finalizeCurrentPage(false);
 
-        // یک صفحه اختصاصی شکیل برای اهداف و جدول ارزیابی اضافه می‌کنیم
-        currentPageNum++;
+        // ایجاد صفحه اختصاصی برای اهداف و جدول ارزیابی هفتگی
         pages.push({
           pageNumber: currentPageNum,
           isFirstPage: false,
@@ -819,9 +814,7 @@ export default function App() {
           estimatedHeight: GOALS_TRACKER_HEIGHT,
         });
       }
-    }
-
-    if (pages.length === 0) {
+    } else {
       pages.push({
         pageNumber: 1,
         isFirstPage: true,
@@ -848,9 +841,9 @@ export default function App() {
   const currentPageData = dynamicPages[activePage - 1] || dynamicPages[0];
   const activePageBudget = useMemo(() => {
     if (!currentPageData) {
-      return { totalHeight: 0, maxBudget: 920, percentage: 0, isOptimal: true };
+      return { totalHeight: 0, maxBudget: 880, percentage: 0, isOptimal: true };
     }
-    const maxBudget = currentPageData.isFirstPage ? 520 : 920;
+    const maxBudget = currentPageData.isFirstPage ? 540 : 880;
     const totalHeight = currentPageData.estimatedHeight;
     return {
       totalHeight,
@@ -862,21 +855,19 @@ export default function App() {
 
   // Rock-solid table-based block row renderer (prevents any RTL flex overlapping & enforces break-inside: avoid)
   const renderBlockRow = (b: Block) => {
-    const blockH = calculateBlockHeight(b);
     return (
       <div
         key={b.id}
-        className="block-row p-2 px-3.5 space-y-1"
+        className="block-row py-1.5 px-3 space-y-0.5"
         style={{
           breakInside: 'avoid',
           pageBreakInside: 'avoid',
-          minHeight: `${blockH}px`,
         }}
       >
         <div style={{ display: 'table', width: '100%', tableLayout: 'fixed' }}>
-          <div style={{ display: 'table-cell', width: '118px', verticalAlign: 'middle' }}>
+          <div style={{ display: 'table-cell', width: '110px', verticalAlign: 'middle' }}>
             <span
-              className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-black ${
+              className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[9.5px] font-black ${
                 b.type === 'study'
                   ? 'bg-[#FFF1EA] text-[#C93A00]'
                   : b.type === 'test'
@@ -896,39 +887,39 @@ export default function App() {
               <span>{b.typeTitle}</span>
             </span>
           </div>
-          <div style={{ display: 'table-cell', verticalAlign: 'middle', padding: '0 10px', textAlign: 'right' }}>
-            <div className="font-black text-[13px] leading-[20px] text-[#111111]" style={{ letterSpacing: 'normal' }}>{b.subject}</div>
-            <div className="text-[11px] leading-[18px] text-[#3e3e3e] break-words font-medium" style={{ letterSpacing: 'normal' }}>{b.topic}</div>
+          <div style={{ display: 'table-cell', verticalAlign: 'middle', padding: '0 8px', textAlign: 'right' }}>
+            <div className="font-black text-[12.5px] leading-[18px] text-[#111111]" style={{ letterSpacing: 'normal' }}>{b.subject}</div>
+            <div className="text-[10.5px] leading-[16px] text-[#3e3e3e] break-words font-medium" style={{ letterSpacing: 'normal' }}>{b.topic}</div>
           </div>
-          <div style={{ display: 'table-cell', width: '126px', verticalAlign: 'middle', textAlign: 'left' }}>
+          <div style={{ display: 'table-cell', width: '120px', verticalAlign: 'middle', textAlign: 'left' }}>
             {includeTimings ? (
               <>
-                <div className="font-black text-[12px] leading-[18px] whitespace-nowrap text-[#111111]" style={{ letterSpacing: 'normal' }}>
+                <div className="font-black text-[11.5px] leading-[17px] whitespace-nowrap text-[#111111]" style={{ letterSpacing: 'normal' }}>
                   {(b.startTime || b.endTime) ? `${b.startTime || '—'} – ${b.endTime || '—'}` : 'ساعت شناور'}
                 </div>
-                <div className="text-[10px] leading-[15px] text-[#6B6B6B] font-semibold" style={{ letterSpacing: 'normal' }}>{b.duration || 'مدت دلخواه'}</div>
+                <div className="text-[9.5px] leading-[14px] text-[#6B6B6B] font-semibold" style={{ letterSpacing: 'normal' }}>{b.duration || 'مدت دلخواه'}</div>
               </>
             ) : (
               <div>
-                <div className="font-bold text-[10.5px] leading-[18px] whitespace-nowrap text-[#222222] bg-[#f0eee9] border border-[#d8d3ca] rounded-md px-2 py-0.5 inline-block" style={{ letterSpacing: 'normal' }}>
+                <div className="font-bold text-[10px] leading-[16px] whitespace-nowrap text-[#222222] bg-[#f0eee9] border border-[#d8d3ca] rounded-md px-1.5 py-0.5 inline-block" style={{ letterSpacing: 'normal' }}>
                   ⏱️ زمان شناور
                 </div>
                 {b.duration && b.duration !== 'شناور' && (
-                  <div className="text-[9.5px] leading-[15px] text-[#6B6B6B] font-semibold mt-0.5" style={{ letterSpacing: 'normal' }}>{b.duration}</div>
+                  <div className="text-[9px] leading-[13px] text-[#6B6B6B] font-semibold mt-0.5" style={{ letterSpacing: 'normal' }}>{b.duration}</div>
                 )}
               </div>
             )}
           </div>
-          <div style={{ display: 'table-cell', width: '60px', verticalAlign: 'middle', textAlign: 'left' }}>
+          <div style={{ display: 'table-cell', width: '56px', verticalAlign: 'middle', textAlign: 'left' }}>
             {b.extra && (
-              <span className="inline-block text-[10px] font-black text-[#C93A00] bg-[#FFF1EA] rounded-md px-1.5 py-0.5 whitespace-nowrap border border-[#ffd2bf]" style={{ letterSpacing: 'normal' }}>
+              <span className="inline-block text-[9.5px] font-black text-[#C93A00] bg-[#FFF1EA] rounded px-1.5 py-0.5 whitespace-nowrap border border-[#ffd2bf]" style={{ letterSpacing: 'normal' }}>
                 {b.extra}
               </span>
             )}
           </div>
         </div>
         {b.note && (
-          <div className="border-r-[2.5px] border-[#FF4F12] pr-2.5 text-[10.5px] leading-[1.8] text-[#444] mt-1.5 break-words font-medium" style={{ letterSpacing: 'normal' }}>
+          <div className="border-r-[2.5px] border-[#FF4F12] pr-2 text-[10px] leading-[1.6] text-[#444] mt-1 break-words font-medium" style={{ letterSpacing: 'normal' }}>
             <span className="text-[#C93A00] font-bold ml-1">توصیه مشاور:</span>
             <span>{b.note}</span>
           </div>
@@ -1272,101 +1263,113 @@ export default function App() {
       ? [pageRefs.current[activePage - 1] || allPages[0]].filter(Boolean) as HTMLDivElement[]
       : allPages;
 
-    for (let i = 0; i < targetPages.length; i++) {
-      const pageEl = targetPages[i];
-      const pageNum = onlyActivePage ? activePage : i + 1;
-      setPdfProgress(`در حال پردازش و ثبت گرافیک صفحه ${pageNum} از ${targetPages.length} با قطع فیزیکی A4...`);
+    const savedScrollX = window.scrollX;
+    const savedScrollY = window.scrollY;
+    if (savedScrollY !== 0 || savedScrollX !== 0) {
+      window.scrollTo(0, 0);
+    }
 
-      // Ensure pageEl is temporarily visible in DOM so browser calculates all layout metrics
-      const prevDisplay = pageEl.style.display;
-      pageEl.style.display = 'flex';
+    try {
+      for (let i = 0; i < targetPages.length; i++) {
+        const pageEl = targetPages[i];
+        const pageNum = onlyActivePage ? activePage : i + 1;
+        setPdfProgress(`در حال پردازش و ثبت گرافیک صفحه ${pageNum} از ${targetPages.length} با قطع فیزیکی A4...`);
 
-      // Clone page element into a standalone unscaled attached container
-      const clone = pageEl.cloneNode(true) as HTMLDivElement;
-      clone.style.display = 'flex';
-      clone.style.flexDirection = 'column';
-      clone.style.justifyContent = 'space-between';
-      clone.style.position = 'fixed';
-      clone.style.left = '0';
-      clone.style.top = '0';
-      clone.style.width = '794px'; // 210mm at 96 DPI
-      clone.style.minHeight = '1123px'; // 297mm at 96 DPI
-      clone.style.height = '1123px';
-      clone.style.maxHeight = '1123px';
-      clone.style.transform = 'none';
-      clone.style.zIndex = '99998';
-      clone.style.opacity = '1'; // 100% fully opaque - never transparent!
-      clone.style.visibility = 'visible';
-      clone.style.pointerEvents = 'none';
-      clone.style.backgroundColor = '#ffffff';
-      clone.style.boxSizing = 'border-box';
-      clone.style.overflow = 'hidden';
-      clone.style.direction = 'rtl';
-      clone.style.fontFamily = "'Vazirmatn', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
-      clone.style.letterSpacing = 'normal';
+        // Ensure pageEl is temporarily visible in DOM so browser calculates all layout metrics
+        const prevDisplay = pageEl.style.display;
+        pageEl.style.display = 'flex';
 
-      // Explicitly enforce letter-spacing: normal, full opacity and visibility on every descendant
-      const allChildren = clone.querySelectorAll<HTMLElement>('*');
-      allChildren.forEach((child) => {
-        child.style.letterSpacing = 'normal';
-        child.style.fontFeatureSettings = 'normal';
-        child.style.wordSpacing = 'normal';
-        if (child.style.opacity === '0' || child.style.opacity === '0.01') {
-          child.style.opacity = '1';
+        // Clone page element into a standalone unscaled attached container
+        const clone = pageEl.cloneNode(true) as HTMLDivElement;
+        clone.style.display = 'flex';
+        clone.style.flexDirection = 'column';
+        clone.style.justifyContent = 'space-between';
+        clone.style.position = 'fixed';
+        clone.style.left = '0';
+        clone.style.top = '0';
+        clone.style.width = '794px'; // 210mm at 96 DPI
+        clone.style.minHeight = '1123px'; // 297mm at 96 DPI
+        clone.style.height = '1123px';
+        clone.style.maxHeight = '1123px';
+        clone.style.transform = 'none';
+        clone.style.zIndex = '99998';
+        clone.style.opacity = '1'; // 100% fully opaque - never transparent!
+        clone.style.visibility = 'visible';
+        clone.style.pointerEvents = 'none';
+        clone.style.backgroundColor = '#ffffff';
+        clone.style.boxSizing = 'border-box';
+        clone.style.overflow = 'hidden';
+        clone.style.direction = 'rtl';
+        clone.style.fontFamily = "'Vazirmatn', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+        clone.style.letterSpacing = 'normal';
+
+        // Explicitly enforce letter-spacing: normal, full opacity and visibility on every descendant
+        const allChildren = clone.querySelectorAll<HTMLElement>('*');
+        allChildren.forEach((child) => {
+          child.style.letterSpacing = 'normal';
+          child.style.fontFeatureSettings = 'normal';
+          child.style.wordSpacing = 'normal';
+          if (child.style.opacity === '0' || child.style.opacity === '0.01') {
+            child.style.opacity = '1';
+          }
+        });
+
+        // Preload and wait for any images inside the clone
+        const images = Array.from(clone.querySelectorAll('img'));
+        await Promise.all(
+          images.map((img) => {
+            if (img.complete) return Promise.resolve();
+            return new Promise((resolve) => {
+              img.onload = resolve;
+              img.onerror = resolve;
+            });
+          })
+        );
+
+        document.body.appendChild(clone);
+
+        // Wait a short tick for layout to compute
+        await new Promise((resolve) => setTimeout(resolve, 80));
+
+        // Optimized high-speed canvas capture with crystal-clear print quality
+        const canvas = await html2canvas(clone, {
+          scale: 1.6, // High DPI, 3x faster generation and 60% smaller file size
+          useCORS: true,
+          allowTaint: true,
+          backgroundColor: '#ffffff',
+          logging: false,
+          imageTimeout: 10000,
+          scrollX: 0,
+          scrollY: 0,
+          x: 0,
+          y: 0,
+          width: 794,
+          height: 1123,
+          windowWidth: 794,
+          windowHeight: 1123,
+          onclone: (clonedDoc: Document) => {
+            clonedDoc.body.style.backgroundColor = '#ffffff';
+            clonedDoc.body.style.color = '#111111';
+          },
+        });
+
+        const imgData = canvas.toDataURL('image/jpeg', 0.92);
+
+        // Clean up clone & restore original display
+        document.body.removeChild(clone);
+        pageEl.style.display = prevDisplay;
+
+        if (i > 0) {
+          pdf.addPage('a4', 'portrait');
         }
-      });
 
-      // Preload and wait for any images inside the clone
-      const images = Array.from(clone.querySelectorAll('img'));
-      await Promise.all(
-        images.map((img) => {
-          if (img.complete) return Promise.resolve();
-          return new Promise((resolve) => {
-            img.onload = resolve;
-            img.onerror = resolve;
-          });
-        })
-      );
-
-      document.body.appendChild(clone);
-
-      // Wait a short tick for layout to compute
-      await new Promise((resolve) => setTimeout(resolve, 80));
-
-      // Optimized high-speed canvas capture with crystal-clear print quality
-      const canvas = await html2canvas(clone, {
-        scale: 1.6, // High DPI, 3x faster generation and 60% smaller file size
-        useCORS: true,
-        allowTaint: true,
-        backgroundColor: '#ffffff',
-        logging: false,
-        imageTimeout: 10000,
-        scrollX: 0,
-        scrollY: 0,
-        x: 0,
-        y: 0,
-        width: 794,
-        height: 1123,
-        windowWidth: 794,
-        windowHeight: 1123,
-        onclone: (clonedDoc: Document) => {
-          clonedDoc.body.style.backgroundColor = '#ffffff';
-          clonedDoc.body.style.color = '#111111';
-        },
-      });
-
-      const imgData = canvas.toDataURL('image/jpeg', 0.92);
-
-      // Clean up clone & restore original display
-      document.body.removeChild(clone);
-      pageEl.style.display = prevDisplay;
-
-      if (i > 0) {
-        pdf.addPage('a4', 'portrait');
+        // Exact physical A4 dimensions: 210mm x 297mm
+        pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297, undefined, 'FAST');
       }
-
-      // Exact physical A4 dimensions: 210mm x 297mm
-      pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297, undefined, 'FAST');
+    } finally {
+      if (savedScrollY !== 0 || savedScrollX !== 0) {
+        window.scrollTo(savedScrollX, savedScrollY);
+      }
     }
 
     setPdfProgress("در حال نهایی‌سازی و ساخت فایل خروجی...");
@@ -1919,8 +1922,8 @@ export default function App() {
                 {/* DYNAMIC MULTI-PAGE RENDERER (Dynamically expands or contracts pages based on schedule volume) */}
                 {(() => {
                   const renderMainHeader = () => (
-                    <header className="bg-[#111111] text-white flex items-center gap-5 px-[12mm] py-[5mm] border-b-[4px] border-[#FF4F12]">
-                      <div className="w-[24mm] h-[24mm] bg-white rounded-2xl flex items-center justify-center p-1.5 shrink-0 shadow">
+                    <header className="bg-[#111111] text-white flex items-center gap-4 px-[12mm] py-[3.5mm] border-b-[3.5px] border-[#FF4F12]">
+                      <div className="w-[20mm] h-[20mm] bg-white rounded-xl flex items-center justify-center p-1.5 shrink-0 shadow">
                         <img
                           src={zetaLogo}
                           onError={(e) => {
@@ -1932,15 +1935,15 @@ export default function App() {
                       </div>
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-0.5">
-                          <h1 className="text-[26px] font-black leading-tight" style={{ letterSpacing: 'normal' }}>برنامه هفتگی</h1>
-                          <span className="bg-[#FF4F12] text-white text-[9.5px] font-black px-2 py-0.5 rounded-full" style={{ letterSpacing: 'normal' }}>
+                          <h1 className="text-[23px] font-black leading-tight" style={{ letterSpacing: 'normal' }}>برنامه هفتگی</h1>
+                          <span className="bg-[#FF4F12] text-white text-[9px] font-black px-2 py-0.5 rounded-full" style={{ letterSpacing: 'normal' }}>
                             ZETA PLAN
                           </span>
                         </div>
-                        <div className="w-[48px] h-[3.5px] bg-[#FF4F12] rounded-full my-1"></div>
-                        <div className="text-[11.5px] text-neutral-300 font-medium" style={{ letterSpacing: 'normal' }}>موسسه آموزشی و مشاوره‌ای زتا</div>
+                        <div className="w-[42px] h-[3px] bg-[#FF4F12] rounded-full my-0.5"></div>
+                        <div className="text-[11px] text-neutral-300 font-medium" style={{ letterSpacing: 'normal' }}>موسسه آموزشی و مشاوره‌ای زتا</div>
                       </div>
-                      <div className="flex flex-col gap-1 text-[11px] text-white border-r-2 border-neutral-700 pr-4 whitespace-nowrap">
+                      <div className="flex flex-col gap-0.5 text-[10.5px] text-white border-r-2 border-neutral-700 pr-3.5 whitespace-nowrap">
                         <div className="flex items-center gap-1.5">
                           <span className="text-neutral-400 text-[10px]">شروع:</span>
                           <span className="font-bold" style={{ letterSpacing: 'normal' }}>{weekRange.start || 'شنبه'}</span>
@@ -1954,14 +1957,14 @@ export default function App() {
                   );
 
                   const renderMiniHeader = () => (
-                    <div className="mx-[12mm] py-2.5 flex justify-between items-center text-[11px] text-[#6B6B6B] border-b border-[#E8E8E8]">
+                    <div className="mx-[12mm] py-2 flex justify-between items-center text-[11px] text-[#6B6B6B] border-b border-[#E8E8E8]">
                       <div className="flex items-center gap-2">
                         <span className="font-black text-[13px] text-[#111111]" style={{ letterSpacing: 'normal' }}>Zeta | زتا</span>
                         <span className="text-[9.5px] font-bold bg-[#FF4F12] text-white px-2 py-0.5 rounded-full">برنامه هفتگی اختصاصی</span>
                       </div>
                       <div className="flex items-center gap-1.5 text-[11px]">
                         <span className="text-neutral-400">دانش‌آموز:</span>
-                        <span className="font-black text-[#111111] text-[13px]" style={{ letterSpacing: 'normal' }}>{student.name || 'نام دانش‌آموز'}</span>
+                        <span className="font-black text-[#111111] text-[12.5px]" style={{ letterSpacing: 'normal' }}>{student.name || 'نام دانش‌آموز'}</span>
                         <span className="text-neutral-300 mx-1.5">|</span>
                         <span className="font-semibold text-neutral-600">{(weekRange.start || 'شنبه') + ' تا ' + (weekRange.end || 'جمعه')}</span>
                       </div>
@@ -1969,7 +1972,7 @@ export default function App() {
                   );
 
                   const renderPageFooter = (pageNum: number, totalPages: number) => (
-                    <footer className="mx-[12mm] py-2.5 border-t-[1.5px] border-[#FF4F12] flex justify-between items-center text-[10px] text-[#6B6B6B] mt-auto">
+                    <footer className="mx-[12mm] py-2 border-t-[1.5px] border-[#FF4F12] flex justify-between items-center text-[10px] text-[#6B6B6B] shrink-0">
                       <span className="font-extrabold text-[#111111]">Zeta | زتا</span>
                       <span>صفحه {pageNum} از {totalPages}</span>
                       <span>{advisor.createdDate || 'برنامه هفتگی اختصاصی'}</span>
@@ -1977,52 +1980,52 @@ export default function App() {
                   );
 
                   const renderInfoCard = () => (
-                    <div style={{ display: 'table', width: '100%', tableLayout: 'fixed' }} className="border-[1.5px] border-[#FF4F12] rounded-[14px] overflow-hidden bg-white shadow-xs">
-                      <div style={{ display: 'table-cell', width: '50%', verticalAlign: 'top' }} className="p-2.5 px-3">
-                        <div className="flex items-center justify-between border-b border-[#f0ece6] pb-1.5 mb-1.5">
-                          <div className="flex items-center gap-1.5 text-[11px] font-black text-[#C93A00]">
-                            <span className="w-2 h-2 rounded-full bg-[#FF4F12]"></span>
+                    <div style={{ display: 'table', width: '100%', tableLayout: 'fixed' }} className="border-[1.5px] border-[#FF4F12] rounded-[12px] overflow-hidden bg-white shadow-2xs">
+                      <div style={{ display: 'table-cell', width: '50%', verticalAlign: 'top' }} className="p-2 px-3">
+                        <div className="flex items-center justify-between border-b border-[#f0ece6] pb-1 mb-1">
+                          <div className="flex items-center gap-1.5 text-[10.5px] font-black text-[#C93A00]">
+                            <span className="w-1.5 h-1.5 rounded-full bg-[#FF4F12]"></span>
                             <span>مشخصات دانش‌آموز</span>
                           </div>
-                          <span className="text-[10px] font-bold text-neutral-600 bg-[#f6f3ef] px-2 py-0.5 rounded-full border border-[#e5ded4]" style={{ letterSpacing: 'normal' }}>
+                          <span className="text-[9.5px] font-bold text-neutral-600 bg-[#f6f3ef] px-2 py-0.5 rounded-full border border-[#e5ded4]" style={{ letterSpacing: 'normal' }}>
                             {student.grade} · {student.field}
                           </span>
                         </div>
-                        <div className="space-y-1">
+                        <div className="space-y-0.5">
                           <div className="flex items-center gap-2">
-                            <span className="text-[10.5px] font-bold text-neutral-400 shrink-0 w-[38px]">نام:</span>
-                            <span className="text-[16px] font-black text-[#111111] leading-normal" style={{ letterSpacing: 'normal' }}>
+                            <span className="text-[10px] font-bold text-neutral-400 shrink-0 w-[36px]">نام:</span>
+                            <span className="text-[15px] font-black text-[#111111] leading-tight" style={{ letterSpacing: 'normal' }}>
                               {student.name || 'نام دانش‌آموز'}
                             </span>
                           </div>
-                          <div className="flex items-center gap-2 text-[10.5px]">
-                            <span className="text-[10.5px] font-bold text-neutral-400 shrink-0 w-[38px]">هدف:</span>
-                            <span className="font-bold text-[#C93A00] leading-normal" style={{ letterSpacing: 'normal' }}>
+                          <div className="flex items-center gap-2 text-[10px]">
+                            <span className="text-[10px] font-bold text-neutral-400 shrink-0 w-[36px]">هدف:</span>
+                            <span className="font-bold text-[#C93A00] leading-tight" style={{ letterSpacing: 'normal' }}>
                               {student.target ? `🎯 ${student.target}` : '🎯 هدف تحصیلی'}
                             </span>
                           </div>
                         </div>
                       </div>
-                      <div style={{ display: 'table-cell', width: '50%', verticalAlign: 'top' }} className="p-2.5 px-3 border-r border-[#ffd2bf] bg-[#FFF1EA]">
-                        <div className="flex items-center justify-between border-b border-[#ffd2bf] pb-1.5 mb-1.5">
-                          <div className="flex items-center gap-1.5 text-[11px] font-black text-[#C93A00]">
-                            <span className="w-2 h-2 rounded-full bg-[#FF4F12]"></span>
+                      <div style={{ display: 'table-cell', width: '50%', verticalAlign: 'top' }} className="p-2 px-3 border-r border-[#ffd2bf] bg-[#FFF1EA]">
+                        <div className="flex items-center justify-between border-b border-[#ffd2bf] pb-1 mb-1">
+                          <div className="flex items-center gap-1.5 text-[10.5px] font-black text-[#C93A00]">
+                            <span className="w-1.5 h-1.5 rounded-full bg-[#FF4F12]"></span>
                             <span>مشاور تحصیلی و برنامه‌ریز</span>
                           </div>
-                          <span className="text-[10px] font-bold text-[#C93A00] bg-white px-2 py-0.5 rounded-full border border-[#ffd2bf]" style={{ letterSpacing: 'normal' }}>
+                          <span className="text-[9.5px] font-bold text-[#C93A00] bg-white px-2 py-0.5 rounded-full border border-[#ffd2bf]" style={{ letterSpacing: 'normal' }}>
                             {advisor.weekTitle || 'برنامه هفتگی'}
                           </span>
                         </div>
-                        <div className="space-y-1">
+                        <div className="space-y-0.5">
                           <div className="flex items-center gap-2">
-                            <span className="text-[10.5px] font-bold text-[#9e705b] shrink-0 w-[38px]">مشاور:</span>
-                            <span className="text-[15px] font-black text-[#111111] leading-normal" style={{ letterSpacing: 'normal' }}>
+                            <span className="text-[10px] font-bold text-[#9e705b] shrink-0 w-[36px]">مشاور:</span>
+                            <span className="text-[14px] font-black text-[#111111] leading-tight" style={{ letterSpacing: 'normal' }}>
                               {advisor.name || 'مشاور تحصیلی'}
                             </span>
                           </div>
-                          <div className="flex items-center gap-2 text-[10.5px]">
-                            <span className="text-[10.5px] font-bold text-[#9e705b] shrink-0 w-[38px]">تنظیم:</span>
-                            <span className="font-semibold text-neutral-700 leading-normal" style={{ letterSpacing: 'normal' }}>
+                          <div className="flex items-center gap-2 text-[10px]">
+                            <span className="text-[10px] font-bold text-[#9e705b] shrink-0 w-[36px]">تنظیم:</span>
+                            <span className="font-semibold text-neutral-700 leading-tight" style={{ letterSpacing: 'normal' }}>
                               📅 {advisor.createdDate || 'تاریخ صدور'}
                             </span>
                           </div>
@@ -2032,53 +2035,53 @@ export default function App() {
                   );
 
                   const renderChartAndStats = () => (
-                    <div style={{ display: 'table', width: '100%', tableLayout: 'fixed' }} className="bg-[#F6F3EF] rounded-[14px] p-3">
-                      <div style={{ display: 'table-cell', width: '135px', verticalAlign: 'middle', paddingLeft: '12px', borderLeft: '1px solid #e3ddd5' }}>
+                    <div style={{ display: 'table', width: '100%', tableLayout: 'fixed' }} className="bg-[#F6F3EF] rounded-[12px] p-2.5">
+                      <div style={{ display: 'table-cell', width: '130px', verticalAlign: 'middle', paddingLeft: '10px', borderLeft: '1px solid #e3ddd5' }}>
                         {includeTimings ? (
                           <>
-                            <div className="flex flex-col border-b border-[#e3ddd5] pb-1 leading-tight">
-                              <b className="text-[19px] font-extrabold text-[#FF4F12]">{formatHhMmFa(totalMinutes)}</b>
-                              <span className="text-[10px] text-[#6B6B6B]">ساعت کل هفته</span>
+                            <div className="flex flex-col border-b border-[#e3ddd5] pb-0.5 leading-tight">
+                              <b className="text-[17px] font-extrabold text-[#FF4F12]">{formatHhMmFa(totalMinutes)}</b>
+                              <span className="text-[9.5px] text-[#6B6B6B]">ساعت کل هفته</span>
                             </div>
-                            <div className="flex flex-col border-b border-[#e3ddd5] pb-1 leading-tight mt-1">
-                              <b className="text-[19px] font-extrabold text-[#111111]">{String(activeDaysCount).replace(/\d/g, (c) => "۰۱۲۳۴۵۶۷۸۹"[Number(c)])}</b>
-                              <span className="text-[10px] text-[#6B6B6B]">روز فعال</span>
+                            <div className="flex flex-col border-b border-[#e3ddd5] pb-0.5 leading-tight mt-0.5">
+                              <b className="text-[17px] font-extrabold text-[#111111]">{String(activeDaysCount).replace(/\d/g, (c) => "۰۱۲۳۴۵۶۷۸۹"[Number(c)])}</b>
+                              <span className="text-[9.5px] text-[#6B6B6B]">روز فعال</span>
                             </div>
-                            <div className="flex flex-col leading-tight mt-1">
-                              <b className="text-[19px] font-extrabold text-[#111111]">{formatHhMmFa(avgMinutes)}</b>
-                              <span className="text-[10px] text-[#6B6B6B]">میانگین روزانه</span>
+                            <div className="flex flex-col leading-tight mt-0.5">
+                              <b className="text-[17px] font-extrabold text-[#111111]">{formatHhMmFa(avgMinutes)}</b>
+                              <span className="text-[9.5px] text-[#6B6B6B]">میانگین روزانه</span>
                             </div>
                           </>
                         ) : (
                           <>
-                            <div className="flex flex-col border-b border-[#e3ddd5] pb-1 leading-tight">
-                              <b className="text-[19px] font-extrabold text-[#FF4F12]">{String(totalBlocksCount).replace(/\d/g, (c) => "۰۱۲۳۴۵۶۷۸۹"[Number(c)])}</b>
-                              <span className="text-[10px] text-[#6B6B6B]">تعداد کل پارت‌ها</span>
+                            <div className="flex flex-col border-b border-[#e3ddd5] pb-0.5 leading-tight">
+                              <b className="text-[17px] font-extrabold text-[#FF4F12]">{String(totalBlocksCount).replace(/\d/g, (c) => "۰۱۲۳۴۵۶۷۸۹"[Number(c)])}</b>
+                              <span className="text-[9.5px] text-[#6B6B6B]">تعداد کل پارت‌ها</span>
                             </div>
-                            <div className="flex flex-col border-b border-[#e3ddd5] pb-1 leading-tight mt-1">
-                              <b className="text-[19px] font-extrabold text-[#111111]">{String(activeDaysCount).replace(/\d/g, (c) => "۰۱۲۳۴۵۶۷۸۹"[Number(c)])}</b>
-                              <span className="text-[10px] text-[#6B6B6B]">روز مطالعه فعال</span>
+                            <div className="flex flex-col border-b border-[#e3ddd5] pb-0.5 leading-tight mt-0.5">
+                              <b className="text-[17px] font-extrabold text-[#111111]">{String(activeDaysCount).replace(/\d/g, (c) => "۰۱۲۳۴۵۶۷۸۹"[Number(c)])}</b>
+                              <span className="text-[9.5px] text-[#6B6B6B]">روز مطالعه فعال</span>
                             </div>
-                            <div className="flex flex-col leading-tight mt-1">
-                              <b className="text-[18px] font-extrabold text-neutral-800">{avgBlocks}</b>
-                              <span className="text-[10px] text-[#6B6B6B]">میانگین پارت در روز</span>
+                            <div className="flex flex-col leading-tight mt-0.5">
+                              <b className="text-[16px] font-extrabold text-neutral-800">{avgBlocks}</b>
+                              <span className="text-[9.5px] text-[#6B6B6B]">میانگین پارت در روز</span>
                             </div>
                           </>
                         )}
                       </div>
 
-                      <div style={{ display: 'table-cell', verticalAlign: 'bottom', paddingRight: '10px' }}>
-                        <div style={{ display: 'table', width: '100%', height: '90px', tableLayout: 'fixed' }}>
+                      <div style={{ display: 'table-cell', verticalAlign: 'bottom', paddingRight: '8px' }}>
+                        <div style={{ display: 'table', width: '100%', height: '80px', tableLayout: 'fixed' }}>
                           {chartBarsData.map((bar, i) => (
                             <div key={i} style={{ display: 'table-cell', width: '14.28%', verticalAlign: 'bottom', textAlign: 'center' }}>
-                              <div className="text-[9.5px] text-[#6B6B6B] h-[15px] leading-[15px]">{bar.val}</div>
-                              <div className="h-[52px] w-full flex items-end justify-center">
+                              <div className="text-[9px] text-[#6B6B6B] h-[14px] leading-[14px]">{bar.val}</div>
+                              <div className="h-[46px] w-full flex items-end justify-center">
                                 <div
                                   style={{ height: `${bar.height}%` }}
-                                  className={`w-[60%] mx-auto rounded-t-md ${bar.isZero ? 'bg-[#cfcac3] min-h-[3px]' : 'bg-[#FF4F12]'}`}
+                                  className={`w-[58%] mx-auto rounded-t-sm ${bar.isZero ? 'bg-[#cfcac3] min-h-[3px]' : 'bg-[#FF4F12]'}`}
                                 ></div>
                               </div>
-                              <div className="text-[9.5px] font-semibold mt-1 h-[16px] leading-[16px] whitespace-nowrap">{bar.name}</div>
+                              <div className="text-[9px] font-semibold mt-0.5 h-[15px] leading-[15px] whitespace-nowrap">{bar.name}</div>
                             </div>
                           ))}
                         </div>
@@ -2088,31 +2091,31 @@ export default function App() {
 
                   const renderLegendChips = () => (
                     <div className="flex flex-wrap gap-1.5 items-center">
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-[#FFF1EA] text-[#C93A00]">
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold bg-[#FFF1EA] text-[#C93A00]">
                         {renderIcon('study')}
                         <span>مطالعه</span>
                       </span>
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-[#F6F3EF] text-[#444] border border-[#e3ddd5]">
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold bg-[#F6F3EF] text-[#444] border border-[#e3ddd5]">
                         {renderIcon('review')}
                         <span>مرور</span>
                       </span>
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-[#111111] text-white">
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold bg-[#111111] text-white">
                         {renderIcon('test')}
                         <span>تست‌زنی</span>
                       </span>
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-white text-[#C93A00] border border-[#FF4F12]">
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold bg-white text-[#C93A00] border border-[#FF4F12]">
                         {renderIcon('video')}
                         <span>ویدیو / کلاس</span>
                       </span>
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-[#FF4F12] text-white">
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold bg-[#FF4F12] text-white">
                         {renderIcon('exam')}
                         <span>آزمون</span>
                       </span>
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-white text-[#111111] border border-[#111111]">
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold bg-white text-[#111111] border border-[#111111]">
                         {renderIcon('summary')}
                         <span>جمع‌بندی</span>
                       </span>
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-[#E8E8E8] text-[#111111]">
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold bg-[#E8E8E8] text-[#111111]">
                         {renderIcon('doubt')}
                         <span>رفع اشکال</span>
                       </span>
@@ -2124,7 +2127,7 @@ export default function App() {
                       key={`${section.dayId}_${section.isContinued ? 'cont' : 'main'}`}
                       data-day-id={section.dayId}
                       data-day-card="true"
-                      className="day day-card border border-[#E8E8E8] rounded-[14px] overflow-hidden break-inside-avoid bg-white shadow-2xs"
+                      className="day day-card border border-[#E8E8E8] rounded-[12px] overflow-hidden break-inside-avoid bg-white shadow-2xs"
                       style={{
                         breakInside: 'avoid',
                         pageBreakInside: 'avoid',
@@ -2132,48 +2135,48 @@ export default function App() {
                     >
                       {section.isRest ? (
                         <>
-                          <div className="flex justify-between items-center bg-[#F6F3EF] px-3.5 py-2 border-b border-[#E8E8E8]">
+                          <div className="flex justify-between items-center bg-[#F6F3EF] px-3 py-1.5 border-b border-[#E8E8E8]">
                             <div className="flex items-center gap-2">
-                              <span className="text-[14px] font-black text-[#111111]" style={{ letterSpacing: 'normal' }}>{section.dayName}</span>
-                              <span className="text-[10px] font-bold text-neutral-500 bg-white px-2 py-0.5 rounded-md border border-[#e5dfd7]">
+                              <span className="text-[13px] font-black text-[#111111]" style={{ letterSpacing: 'normal' }}>{section.dayName}</span>
+                              <span className="text-[9.5px] font-bold text-neutral-500 bg-white px-2 py-0.5 rounded-md border border-[#e5dfd7]">
                                 {section.dateStr}
                               </span>
                             </div>
-                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black bg-[#FFF1EA] text-[#C93A00] border border-[#ffd2bf]">
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[9.5px] font-black bg-[#FFF1EA] text-[#C93A00] border border-[#ffd2bf]">
                               {renderIcon('rest')}
                               <span>روز استراحت و ریکاوری</span>
                             </span>
                           </div>
-                          <div className="p-3.5 text-[11px] text-[#555] leading-relaxed font-medium">
+                          <div className="p-3 text-[10.5px] text-[#555] leading-relaxed font-medium">
                             {section.restText || 'امروز برنامه درسی نداری. استراحت و خواب کافی بخشی از برنامه است.'}
                           </div>
                         </>
                       ) : (
                         <>
-                          <div className="flex justify-between items-center bg-[#F6F3EF] px-3.5 py-1.5 border-b-2 border-[#111111]">
+                          <div className="flex justify-between items-center bg-[#F6F3EF] px-3 py-1.5 border-b-2 border-[#111111]">
                             <div className="flex items-center gap-2">
-                              <span className="text-[14px] font-black text-[#111111]" style={{ letterSpacing: 'normal' }}>{section.dayName}</span>
-                              <span className="text-[10px] font-bold text-[#C93A00] bg-white px-2 py-0.5 rounded-md border border-[#e5dfd7]">
+                              <span className="text-[13px] font-black text-[#111111]" style={{ letterSpacing: 'normal' }}>{section.dayName}</span>
+                              <span className="text-[9.5px] font-bold text-[#C93A00] bg-white px-2 py-0.5 rounded-md border border-[#e5dfd7]">
                                 {section.dateStr}
                               </span>
                               {section.isContinued && (
-                                <span className="text-[9.5px] font-black text-neutral-600 bg-neutral-200 px-1.5 py-0.5 rounded">
+                                <span className="text-[9px] font-black text-neutral-600 bg-neutral-200 px-1.5 py-0.5 rounded">
                                   ادامه از صفحه قبل
                                 </span>
                               )}
                             </div>
-                            <div className="flex items-center gap-1.5 text-[10px] text-[#6B6B6B]">
+                            <div className="flex items-center gap-1.5 text-[9.5px] text-[#6B6B6B]">
                               {includeTimings ? (
                                 <>
                                   <span className="font-medium">جمع مطالعه:</span>
-                                  <b className="text-[15px] font-black text-[#FF4F12]" style={{ letterSpacing: 'normal' }}>{formatHhMmFa(section.totalDayMinutes)}</b>
-                                  <span className="text-[9.5px]">ساعت</span>
+                                  <b className="text-[14px] font-black text-[#FF4F12]" style={{ letterSpacing: 'normal' }}>{formatHhMmFa(section.totalDayMinutes)}</b>
+                                  <span className="text-[9px]">ساعت</span>
                                 </>
                               ) : (
                                 <>
                                   <span className="font-medium">تعداد فعالیت:</span>
-                                  <b className="text-[15px] font-black text-[#FF4F12]" style={{ letterSpacing: 'normal' }}>{String(section.blocks.length).replace(/\d/g, (c) => "۰۱۲۳۴۵۶۷۸۹"[Number(c)])}</b>
-                                  <span className="text-[9.5px]">پارت شناور</span>
+                                  <b className="text-[14px] font-black text-[#FF4F12]" style={{ letterSpacing: 'normal' }}>{String(section.blocks.length).replace(/\d/g, (c) => "۰۱۲۳۴۵۶۷۸۹"[Number(c)])}</b>
+                                  <span className="text-[9px]">پارت شناور</span>
                                 </>
                               )}
                             </div>
@@ -2183,7 +2186,7 @@ export default function App() {
                             {section.blocks.length > 0 ? (
                               section.blocks.map(renderBlockRow)
                             ) : (
-                              <div className="p-3 text-center text-[10.5px] text-neutral-400 font-medium">
+                              <div className="p-2.5 text-center text-[10px] text-neutral-400 font-medium">
                                 برنامه‌ای برای این روز ثبت نشده است.
                               </div>
                             )}
@@ -2193,25 +2196,25 @@ export default function App() {
                     </div>
                   );
 
-                  const renderGoalsAndTracker = () => (
+                  const renderGoalsAndTracker = (isDedicatedPage: boolean = false) => (
                     <div className="space-y-2.5">
                       {/* Goals Section */}
                       <div
-                        className="day-card card-avoid-break bg-[#FFF1EA] rounded-[14px] p-3 border border-[#ffd2bf] break-inside-avoid shadow-2xs"
+                        className="day-card card-avoid-break bg-[#FFF1EA] rounded-[12px] p-2.5 border border-[#ffd2bf] break-inside-avoid shadow-2xs"
                         style={{
                           breakInside: 'avoid',
                           pageBreakInside: 'avoid',
                         }}
                       >
-                        <div className="flex items-center justify-between border-b border-[#ffd2bf] pb-1.5 mb-1.5">
-                          <h2 className="text-[13px] font-black text-[#111111] flex items-center gap-2 before:content-[''] before:w-1.5 before:h-4 before:bg-[#FF4F12] before:rounded-sm">
-                            اهداف و توصیه‌های مشاور
+                        <div className="flex items-center justify-between border-b border-[#ffd2bf] pb-1 mb-1">
+                          <h2 className="text-[12.5px] font-black text-[#111111] flex items-center gap-1.5 before:content-[''] before:w-1.5 before:h-3.5 before:bg-[#FF4F12] before:rounded-xs">
+                            اهداف و توصیه‌های طلایی مشاور
                           </h2>
-                          <span className="text-[10px] font-bold text-[#C93A00] bg-white px-2 py-0.5 rounded-full border border-[#ffd2bf]">
-                            توصیه‌های طلایی هفته
+                          <span className="text-[9.5px] font-bold text-[#C93A00] bg-white px-2 py-0.5 rounded-full border border-[#ffd2bf]">
+                            توصیه‌های کلیدی هفته
                           </span>
                         </div>
-                        <div className="text-[11px] leading-[1.9] text-[#2b2b2b] space-y-1 font-medium">
+                        <div className="text-[10.5px] leading-[1.8] text-[#2b2b2b] space-y-0.5 font-medium">
                           {goals.map((g, idx) => (
                             <p key={idx} className="flex items-start gap-1.5">
                               <span className="text-[#FF4F12] font-black mt-0.5">•</span>
@@ -2229,15 +2232,15 @@ export default function App() {
                           pageBreakInside: 'avoid',
                         }}
                       >
-                        <div className="flex items-center justify-between mb-1.5">
-                          <h2 className="text-[13px] font-black text-[#111111] flex items-center gap-2 before:content-[''] before:w-1.5 before:h-4 before:bg-[#FF4F12] before:rounded-sm">
+                        <div className="flex items-center justify-between mb-1">
+                          <h2 className="text-[12.5px] font-black text-[#111111] flex items-center gap-1.5 before:content-[''] before:w-1.5 before:h-3.5 before:bg-[#FF4F12] before:rounded-xs">
                             جدول ارزیابی و پیگیری اجرای برنامه
                           </h2>
-                          <span className="text-[10px] text-neutral-500 font-semibold">تکمیل روزانه توسط دانش‌آموز</span>
+                          <span className="text-[9.5px] text-neutral-500 font-semibold">تکمیل روزانه توسط دانش‌آموز</span>
                         </div>
                         <table className="w-full border-separate border-spacing-0 border border-[#E8E8E8] rounded-xl overflow-hidden text-center">
                           <thead>
-                            <tr className="bg-[#111111] text-white text-[10.5px] font-bold">
+                            <tr className="bg-[#111111] text-white text-[10px] font-bold">
                               <th className="p-1 px-2 text-right font-bold">روز</th>
                               <th className="p-1 px-2 font-bold">انجام شد ✓</th>
                               <th className="p-1 px-2 font-bold">نیمه‌کاره ◐</th>
@@ -2245,7 +2248,7 @@ export default function App() {
                               <th className="p-1 px-2 text-right font-bold">یادداشت و بررسی علت</th>
                             </tr>
                           </thead>
-                          <tbody className="divide-y divide-[#E8E8E8] text-[10.5px]">
+                          <tbody className="divide-y divide-[#E8E8E8] text-[10px]">
                             {days.map((day, idx) => (
                               <tr key={day.id} className={idx % 2 === 1 ? 'bg-[#FCFAF8]' : 'bg-white'}>
                                 <td className="p-1 px-2 font-black text-right w-[70px] text-neutral-800">{day.name}</td>
@@ -2258,6 +2261,61 @@ export default function App() {
                           </tbody>
                         </table>
                       </div>
+
+                      {/* Extra Rich Tools if on Dedicated Page (Fills page handsomely and meaningfully) */}
+                      {isDedicatedPage && (
+                        <>
+                          {/* Sleep & Focus Habit Tracker */}
+                          <div className="day-card card-avoid-break break-inside-avoid">
+                            <div className="flex items-center justify-between mb-1">
+                              <h2 className="text-[12px] font-black text-[#111111] flex items-center gap-1.5 before:content-[''] before:w-1.5 before:h-3.5 before:bg-[#FF4F12] before:rounded-xs">
+                                جدول پایش کیفیت خواب، تمرکز و مدیریت زمان
+                              </h2>
+                              <span className="text-[9.5px] text-neutral-500 font-semibold">ثبت عادات مهم تحصیلی</span>
+                            </div>
+                            <table className="w-full border-separate border-spacing-0 border border-[#E8E8E8] rounded-xl overflow-hidden text-center text-[9.5px]">
+                              <thead>
+                                <tr className="bg-neutral-800 text-white font-bold">
+                                  <th className="p-1 px-2 text-right">روز هفته</th>
+                                  <th className="p-1 px-2">ساعت خواب شب</th>
+                                  <th className="p-1 px-2">ساعت بیداری</th>
+                                  <th className="p-1 px-2">مجموع خواب</th>
+                                  <th className="p-1 px-2">زمان استفاده از گوشی</th>
+                                  <th className="p-1 px-2">نمره تمرکز (۱ تا ۱۰)</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-[#E8E8E8]">
+                                {days.map((day, idx) => (
+                                  <tr key={day.id} className={idx % 2 === 1 ? 'bg-[#FCFAF8]' : 'bg-white'}>
+                                    <td className="p-1 px-2 font-bold text-right text-neutral-800">{day.name}</td>
+                                    <td className="p-1 px-2 text-neutral-400">__:__</td>
+                                    <td className="p-1 px-2 text-neutral-400">__:__</td>
+                                    <td className="p-1 px-2 text-neutral-400">__ ساعت</td>
+                                    <td className="p-1 px-2 text-neutral-400">__ دقیقه</td>
+                                    <td className="p-1 px-2 text-neutral-400 font-bold">__/۱۰</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+
+                          {/* Consultant Final Assessment & Signature Box */}
+                          <div className="border border-[#ffd2bf] rounded-xl p-2.5 bg-[#FFF9F5] space-y-1.5">
+                            <div className="flex items-center justify-between border-b border-[#ffd2bf] pb-1">
+                              <span className="text-[11px] font-black text-[#C93A00]">
+                                ✍️ ارزیابی هفتگی مشاور و نکات جلسه تحلیلی:
+                              </span>
+                              <span className="text-[9.5px] font-bold text-neutral-500">
+                                امضا و تایید مشاور: ........................
+                              </span>
+                            </div>
+                            <div className="h-[48px] border-b border-dashed border-[#e8d5cc] flex flex-col justify-between py-1">
+                              <div className="border-b border-dashed border-[#e8d5cc] h-[20px]"></div>
+                              <div className="h-[20px]"></div>
+                            </div>
+                          </div>
+                        </>
+                      )}
                     </div>
                   );
 
@@ -2268,26 +2326,26 @@ export default function App() {
                         pageRefs.current[idx] = el;
                       }}
                       style={{ display: activePage === page.pageNumber ? 'flex' : 'none' }}
-                      className="print-page flex-col h-[297mm] max-h-[297mm] w-[210mm] justify-between bg-white box-border overflow-hidden"
+                      className="print-page flex flex-col h-[297mm] max-h-[297mm] w-[210mm] justify-between bg-white box-border overflow-hidden"
                     >
-                      <div>
+                      <div className="flex-1 flex flex-col justify-start">
                         {page.isFirstPage ? (
                           <>
                             {renderMainHeader()}
-                            <div className="px-[12mm] py-[5mm] flex flex-col gap-2">
+                            <div className="px-[12mm] py-[3.5mm] flex flex-col gap-2">
                               {renderInfoCard()}
                               {renderChartAndStats()}
                               {renderLegendChips()}
                               {page.sections.map(renderDayCard)}
-                              {page.hasGoalsAndTracker && renderGoalsAndTracker()}
+                              {page.hasGoalsAndTracker && renderGoalsAndTracker(page.sections.length === 0)}
                             </div>
                           </>
                         ) : (
                           <>
                             {renderMiniHeader()}
-                            <div className="px-[12mm] py-[5mm] flex flex-col gap-2.5">
+                            <div className="px-[12mm] py-[3.5mm] flex flex-col gap-2">
                               {page.sections.map(renderDayCard)}
-                              {page.hasGoalsAndTracker && renderGoalsAndTracker()}
+                              {page.hasGoalsAndTracker && renderGoalsAndTracker(page.sections.length === 0)}
                             </div>
                           </>
                         )}
