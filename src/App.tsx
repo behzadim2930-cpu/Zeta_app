@@ -219,10 +219,7 @@ export default function App() {
   });
   const [chatId, setChatId] = useState<string>(() => {
     const saved = localStorage.getItem('zeta_chat_id');
-    if (saved && saved.trim() && saved !== '8262305691') {
-      return saved.trim();
-    }
-    return '995803013';
+    return (saved && saved.trim()) ? saved.trim() : '';
   });
   const [telegramCaption, setTelegramCaption] = useState<string>(() => "📋 برنامه هفتگی تحصیلی موسسه زتا (فایل پی‌دی‌اف استاندارد A4)");
   const [isTestingToken, setIsTestingToken] = useState<boolean>(false);
@@ -1462,7 +1459,7 @@ export default function App() {
         const sRes = await fetch(`/api/telegram/getLatestChatId?token=${encodeURIComponent(activeToken)}`);
         if (sRes.ok) {
           const sData = await sRes.json();
-          if (sData.ok && sData.chatId && sData.chatId !== '8262305691') {
+          if (sData.ok && sData.chatId) {
             foundId = String(sData.chatId);
             foundName = sData.firstName || sData.username || 'مشاور گرامی';
           }
@@ -1479,9 +1476,7 @@ export default function App() {
               const item = data.result[j];
               const c = item.message?.chat || item.channel_post?.chat;
               if (c && c.id) {
-                const cid = String(c.id);
-                if (cid === '8262305691') continue;
-                foundId = cid;
+                foundId = String(c.id);
                 foundName = c.first_name || c.title || c.username || 'مشاور گرامی';
                 break;
               }
@@ -1493,14 +1488,11 @@ export default function App() {
       if (foundId) {
         setChatId(foundId);
         localStorage.setItem('zeta_chat_id', foundId);
-        setTelegramSendResult({ success: true, message: `✅ شناسه چت ${foundName} (${foundId}) با موفقیت استخراج و متصل شد!` });
+        setTelegramSendResult({ success: true, message: `✅ شناسه چت اختصاصی شما (${foundName} - ${foundId}) با موفقیت استخراج و متصل شد!` });
       } else {
-        // Fallback default
-        setChatId('995803013');
-        localStorage.setItem('zeta_chat_id', '995803013');
         setTelegramSendResult({
-          success: true,
-          message: '✅ شناسه چت مشاور گرامی (995803013) با موفقیت متصل شد.',
+          success: false,
+          message: '⚠️ پیامی از اکانت شما در ربات پیدا نشد. لطفاً در تلگرام وارد @Zetagroupbot شده و دکمه Start یا یک پیام بفرستید، سپس مجدداً این دکمه را لمس فرمایید.',
         });
       }
     } catch (err: any) {
@@ -1510,11 +1502,25 @@ export default function App() {
     }
   };
 
+  // Open Telegram Bot via WebApp openTelegramLink (Smooth in-app experience) or window.open
+  const handleOpenBotInTelegram = (e?: React.MouseEvent) => {
+    if (e) e.preventDefault();
+    const botUrl = 'https://t.me/Zetagroupbot?start=start';
+    try {
+      const tg = typeof window !== 'undefined' ? (window as any).Telegram?.WebApp : null;
+      if (tg && typeof tg.openTelegramLink === 'function') {
+        tg.openTelegramLink(botUrl);
+        return;
+      }
+    } catch (_) {}
+    window.open(botUrl, '_blank');
+  };
+
   const sendPdfToTelegram = async () => {
     const activeToken = botToken.trim() || DEFAULT_BOT_TOKEN;
 
     // 1. Determine targetChatId:
-    // If inside Telegram WebApp, ALWAYS prioritize the authenticated user's ID
+    // If inside Telegram WebApp, ALWAYS strictly use the authenticated consultant's OWN ID
     let targetChatId = '';
     const tgUser = typeof window !== 'undefined' ? (window as any).Telegram?.WebApp?.initDataUnsafe?.user : null;
     if (tgUser?.id) {
@@ -1522,14 +1528,15 @@ export default function App() {
       setChatId(targetChatId);
       localStorage.setItem('zeta_chat_id', targetChatId);
     } else {
-      const saved = chatId.trim();
-      if (saved && saved !== '8262305691') {
-        targetChatId = saved;
-      } else {
-        targetChatId = '995803013';
-        setChatId(targetChatId);
-        localStorage.setItem('zeta_chat_id', targetChatId);
-      }
+      targetChatId = chatId.trim();
+    }
+
+    if (!targetChatId) {
+      setTelegramSendResult({
+        success: false,
+        message: '⚠️ شناسه تلگرام شما مشخص نیست. لطفاً شناسه چت خود را در کادر تنظیمات تلگرام وارد فرمایید یا برنامه را مستقیماً از داخل تلگرام باز کنید.',
+      });
+      return;
     }
 
     setIsSendingTelegram(true);
@@ -1643,13 +1650,34 @@ export default function App() {
         setPdfSuccessMessage(successNotice);
         setTimeout(() => setPdfSuccessMessage(null), 8000);
       } else {
-        const desc = responseData?.description || '';
-        let errorNotice = `خطای تلگرام: امکان ارسال پیام به چت (${targetChatId}) وجود ندارد.`;
-        if (desc.includes("can't initiate conversation") || desc.includes("blocked") || desc.includes("chat not found")) {
-          errorNotice = `خطای تلگرام: ربات @Zetagroupbot اجازه ارسال پیام به چت (${targetChatId}) را ندارد زیرا هنوز دکمه Start در ربات لمس نشده است. لطفاً ربات را باز کرده و Start را بزنید، یا از دکمه «دانلود مستقیم PDF» استفاده فرمایید.`;
-        } else if (desc) {
-          errorNotice = `خطای تلگرام: ${desc}`;
+        // AUTOMATIC INSTANT DOWNLOAD FAILSAFE:
+        // Ensure user never loses work or waits if Telegram API rejects or blocks
+        try {
+          const downloadUrl = URL.createObjectURL(blob);
+          const dlLink = document.createElement('a');
+          dlLink.href = downloadUrl;
+          dlLink.download = filename;
+          document.body.appendChild(dlLink);
+          dlLink.click();
+          document.body.removeChild(dlLink);
+          setTimeout(() => URL.revokeObjectURL(downloadUrl), 2000);
+        } catch (dlErr) {
+          console.warn("Auto-download failsafe:", dlErr);
         }
+
+        const desc = (responseData?.description || responseData?.persianMessage || '').toLowerCase();
+        let errorNotice = `⚠️ امکان ارسال پیام به چت (${targetChatId}) در تلگرام وجود نداشت، اما فایل PDF فوراً در دستگاه شما دانلود شد!`;
+        
+        if (desc.includes("blocked") || responseData?.persianMessage?.includes("مسدود")) {
+          errorNotice = `🚫 اکانت تلگرام (${targetChatId}) ربات @Zetagroupbot را متوقف و مسدود (Stop and Block) کرده است! تلگرام اجازه ارسال پیام به کاربر مسدودکننده را نمی‌دهد. لطفاً دکمه «شروع مجدد در تلگرام» را بزنید تا رفع مسدودی شود. (فایل PDF شما هم‌اکنون دانلود شد).`;
+        } else if (desc.includes("can't initiate conversation") || desc.includes("chat not found") || desc.includes("initiate")) {
+          errorNotice = `⚠️ ربات @Zetagroupbot اجازه شروع گفتگو با چت (${targetChatId}) را ندارد زیرا هنوز ربات در تلگرام استارت نشده است. لطفاً دکمه «استارت ربات» را لمس فرمایید. (فایل PDF شما هم‌اکنون دانلود شد).`;
+        } else if (responseData?.persianMessage) {
+          errorNotice = `${responseData.persianMessage} (فایل PDF شما هم‌اکنون در دستگاه دانلود شد).`;
+        } else if (responseData?.description) {
+          errorNotice = `خطای تلگرام: ${responseData.description} (فایل PDF به‌صورت مستقیم در دستگاه شما ذخیره شد).`;
+        }
+
         setTelegramSendResult({
           success: false,
           message: errorNotice,
@@ -1657,9 +1685,11 @@ export default function App() {
       }
     } catch (err: any) {
       console.error("Telegram send error:", err);
+      // Trigger instant download as fallback
+      downloadRealPdf(false);
       setTelegramSendResult({
         success: false,
-        message: `خطای ارسال: ${err?.message || 'بررسی ارتباط اینترنت'}`,
+        message: `خطای ارسال به تلگرام: فایل PDF مستقیماً در دستگاه شما ذخیره گردید. (${err?.message || 'بررسی ارتباط'})`,
       });
     } finally {
       setIsSendingTelegram(false);
@@ -1750,16 +1780,16 @@ export default function App() {
             <span className="leading-relaxed">{telegramSendResult.message}</span>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
-            <a
-              href="https://t.me/Zetagroupbot?start=start"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="bg-[#0088cc] hover:bg-[#0077b5] text-white px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-xs transition"
+            <button
+              type="button"
+              onClick={handleOpenBotInTelegram}
+              className="bg-[#0088cc] hover:bg-[#0077b5] text-white px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-xs transition cursor-pointer"
             >
               <Send className="w-3.5 h-3.5" />
-              <span>📱 باز کردن و استارت @Zetagroupbot</span>
-            </a>
+              <span>📱 شروع مجدد و رفع مسدودی @Zetagroupbot</span>
+            </button>
             <button
+              type="button"
               onClick={() => downloadRealPdf(false)}
               className="bg-[#FF4F12] hover:bg-[#C93A00] text-white px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-xs transition cursor-pointer"
             >
@@ -1767,6 +1797,7 @@ export default function App() {
               <span>📥 دانلود مستقیم PDF</span>
             </button>
             <button
+              type="button"
               onClick={fetchLatestChatId}
               disabled={isFetchingChatId}
               className="bg-neutral-800 hover:bg-neutral-900 text-white px-2.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 shadow-xs transition cursor-pointer disabled:opacity-60"
@@ -3330,7 +3361,7 @@ export default function App() {
                       value={chatId}
                       onChange={(e) => setChatId(e.target.value)}
                       dir="ltr"
-                      placeholder="مثال: 995803013"
+                      placeholder="شناسه عددی اکانت تلگرام شما"
                       className="flex-1 bg-neutral-50 border border-neutral-300 rounded-xl p-2.5 text-xs font-mono font-bold focus:ring-2 focus:ring-[#0088cc] focus:outline-none"
                     />
                     <button
@@ -3426,15 +3457,14 @@ export default function App() {
 
                     {!telegramSendResult.success && (
                       <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-rose-200/60">
-                        <a
-                          href="https://t.me/Zetagroupbot?start=start"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="bg-[#0088cc] hover:bg-[#0077b5] text-white px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-xs transition"
+                        <button
+                          type="button"
+                          onClick={handleOpenBotInTelegram}
+                          className="bg-[#0088cc] hover:bg-[#0077b5] text-white px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-xs transition cursor-pointer"
                         >
                           <Send className="w-3.5 h-3.5" />
-                          <span>📱 باز کردن و استارت ربات در تلگرام</span>
-                        </a>
+                          <span>📱 شروع مجدد و رفع مسدودی @Zetagroupbot</span>
+                        </button>
                         <button
                           type="button"
                           onClick={() => downloadRealPdf(false)}
@@ -3447,7 +3477,7 @@ export default function App() {
                           type="button"
                           onClick={fetchLatestChatId}
                           disabled={isFetchingChatId}
-                          className="bg-neutral-800 hover:bg-neutral-900 text-white px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-xs transition cursor-pointer disabled:opacity-60"
+                          className="bg-neutral-800 hover:bg-neutral-900 text-white px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 shadow-xs transition cursor-pointer disabled:opacity-60"
                         >
                           <Sparkles className="w-3.5 h-3.5" />
                           <span>🔍 استخراج خودکار Chat ID من</span>

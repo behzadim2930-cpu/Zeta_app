@@ -152,8 +152,6 @@ app.get('/api/telegram/getLatestChatId', async (req, res) => {
         const m = item?.message;
         if (m && m.chat && m.chat.id) {
           const cid = String(m.chat.id);
-          // Skip known kicked/blocked users
-          if (cid === '8262305691') continue;
           return res.json({
             ok: true,
             chatId: cid,
@@ -164,10 +162,8 @@ app.get('/api/telegram/getLatestChatId', async (req, res) => {
       }
     }
     return res.json({
-      ok: true,
-      chatId: '995803013',
-      firstName: 'Mahdyar',
-      username: 'Hiaroo',
+      ok: false,
+      error: 'هیچ پیامی در ربات تلگرام ثبت نشده است. لطفاً ابتدا در ربات @Zetagroupbot دستور /start یا یک پیام ارسال فرمایید.',
     });
   } catch (err: any) {
     return res.status(500).json({ ok: false, error: err.message });
@@ -231,6 +227,13 @@ app.post('/api/telegram/sendPdf', async (req, res) => {
     });
 
     const tgData = await tgResp.json();
+    if (!tgData.ok) {
+      if (tgData.description?.includes('blocked')) {
+        tgData.persianMessage = `اکانت تلگرام (${chatId}) ربات @Zetagroupbot را مسدود (Stop / Block) کرده است. لطفاً در تلگرام وارد چت @Zetagroupbot شده و دکمه Start (شروع مجدد) را بزنید تا رفع مسدودی شود.`;
+      } else if (tgData.description?.includes("can't initiate") || tgData.description?.includes('chat not found')) {
+        tgData.persianMessage = `ربات @Zetagroupbot اجازه شروع گفتگو با چت (${chatId}) را ندارد زیرا هنوز ربات استارت نشده است. لطفاً دکمه Start را در چت ربات لمس فرمایید.`;
+      }
+    }
     return res.status(tgResp.status).json(tgData);
   } catch (err: any) {
     console.error('Error in sendPdf proxy:', err);
