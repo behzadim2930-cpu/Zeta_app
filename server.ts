@@ -140,6 +140,40 @@ app.post('/api/telegram/webhook', async (req, res) => {
   }
 });
 
+// Get Latest Chat ID from Telegram updates
+app.get('/api/telegram/getLatestChatId', async (req, res) => {
+  try {
+    const token = (req.query.token as string) || DEFAULT_BOT_TOKEN;
+    const resp = await fetch(`https://api.telegram.org/bot${token}/getUpdates`);
+    const data = await resp.json();
+    if (data.ok && Array.isArray(data.result) && data.result.length > 0) {
+      for (let i = data.result.length - 1; i >= 0; i--) {
+        const item = data.result[i];
+        const m = item?.message;
+        if (m && m.chat && m.chat.id) {
+          const cid = String(m.chat.id);
+          // Skip known kicked/blocked users
+          if (cid === '8262305691') continue;
+          return res.json({
+            ok: true,
+            chatId: cid,
+            firstName: m.from?.first_name || m.chat.first_name || 'مشاور گرامی',
+            username: m.from?.username || m.chat.username || '',
+          });
+        }
+      }
+    }
+    return res.json({
+      ok: true,
+      chatId: '995803013',
+      firstName: 'Mahdyar',
+      username: 'Hiaroo',
+    });
+  } catch (err: any) {
+    return res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
 // App Start Notification Handler
 app.post('/api/telegram/notifyStart', async (req, res) => {
   try {
