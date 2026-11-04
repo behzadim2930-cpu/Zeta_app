@@ -1,7 +1,7 @@
 /**
  * Zeta Cloudflare Worker & Pages Edge Router
  * 100% Unblocked Telegram Reverse Proxy for Iran (Zero VPN Required)
- * Handles CORS preflight, FormData streaming, and Base64 PDF dispatch.
+ * Handles CORS preflight, FormData streaming, Base64 PDF dispatch, and SPA asset serving.
  */
 
 export default {
@@ -148,17 +148,33 @@ export default {
       }
     }
 
-    // 5. Cloudflare Pages bundled static assets
+    // 5. Cloudflare Pages / Workers bundled static assets
     if (env && env.ASSETS && typeof env.ASSETS.fetch === 'function') {
       try {
         const assetRes = await env.ASSETS.fetch(request);
         if (assetRes.status < 400) {
           return assetRes;
         }
+        // SPA Fallback: return index.html for React router paths
+        const indexRequest = new Request(new URL('/index.html', request.url), request);
+        return await env.ASSETS.fetch(indexRequest);
       } catch (_) {}
     }
 
-    // 6. Fallback to origin
-    return new Response('Not found', { status: 404 });
+    // 6. Fallback: Proxy to Google AI Studio URL if acting as a reverse proxy
+    try {
+      const dest = new URL("https://ais-pre-sc62ancbog6atlg2ssl57i-512949655823.europe-west3.run.app");
+      url.hostname = dest.hostname;
+      url.protocol = dest.protocol;
+      url.port = dest.port;
+      return await fetch(new Request(url.toString(), {
+        method: request.method,
+        headers: request.headers,
+        body: request.method !== 'GET' && request.method !== 'HEAD' ? request.body : undefined,
+        redirect: "follow",
+      }));
+    } catch (_) {
+      return new Response('Not found', { status: 404 });
+    }
   },
 };

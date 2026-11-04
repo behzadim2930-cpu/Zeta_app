@@ -1719,16 +1719,16 @@ export default function App() {
         }
 
         const desc = (responseData?.description || responseData?.persianMessage || '').toLowerCase();
-        let errorNotice = `⚠️ امکان ارسال پیام به چت (${targetChatId}) در تلگرام وجود نداشت، اما فایل PDF فوراً در دستگاه شما دانلود شد!`;
+        let errorNotice = `⚠️ عدم برقراری ارتباط با تلگرام به دلیل خاموش بودن فیلترشکن: بدون وی‌پی‌ان، ارسال به تلگرام نیازمند فعال‌سازی پروکسی ورکر است. فایل PDF فوراً در دستگاه شما دانلود شد!`;
         
         if (desc.includes("blocked") || responseData?.persianMessage?.includes("مسدود")) {
-          errorNotice = `🚫 اکانت تلگرام (${targetChatId}) ربات @Zetagroupbot را متوقف و مسدود (Stop and Block) کرده است! تلگرام اجازه ارسال پیام به کاربر مسدودکننده را نمی‌دهد. لطفاً دکمه «شروع مجدد در تلگرام» را بزنید تا رفع مسدودی شود. (فایل PDF شما هم‌اکنون دانلود شد).`;
+          errorNotice = `🚫 اکانت تلگرام (${targetChatId}) ربات @Zetagroupbot را متوقف و مسدود (Stop and Block) کرده است. لطفاً دکمه «شروع مجدد در تلگرام» را بزنید تا رفع مسدودی شود. (فایل PDF دانلود شد).`;
         } else if (desc.includes("can't initiate conversation") || desc.includes("chat not found") || desc.includes("initiate")) {
-          errorNotice = `⚠️ ربات @Zetagroupbot اجازه شروع گفتگو با چت (${targetChatId}) را ندارد زیرا هنوز ربات در تلگرام استارت نشده است. لطفاً دکمه «استارت ربات» را لمس فرمایید. (فایل PDF شما هم‌اکنون دانلود شد).`;
+          errorNotice = `⚠️ ربات @Zetagroupbot اجازه شروع گفتگو با چت (${targetChatId}) را ندارد زیرا هنوز ربات در تلگرام استارت نشده است. لطفاً دکمه «استارت ربات» را لمس فرمایید. (فایل PDF دانلود شد).`;
         } else if (responseData?.persianMessage) {
-          errorNotice = `${responseData.persianMessage} (فایل PDF شما هم‌اکنون در دستگاه دانلود شد).`;
+          errorNotice = `${responseData.persianMessage} (فایل PDF شما در دستگاه دانلود شد).`;
         } else if (responseData?.description) {
-          errorNotice = `خطای تلگرام: ${responseData.description} (فایل PDF به‌صورت مستقیم در دستگاه شما ذخیره شد).`;
+          errorNotice = `خطای تلگرام: ${responseData.description} (فایل PDF در دستگاه شما ذخیره شد).`;
         }
 
         setTelegramSendResult({
