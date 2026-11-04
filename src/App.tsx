@@ -1592,7 +1592,7 @@ export default function App() {
         console.warn("Backend sendPdf JSON route failed, trying /tg/ proxy:", proxyErr);
       }
 
-      // Strategy 2: Direct Telegram Proxy via /tg/ (Cloudflare Worker)
+      // Strategy 2: Direct Telegram Proxy via /tg/ (Cloudflare Worker on same origin)
       if (!sendSuccess) {
         try {
           const formData = new FormData();
@@ -1615,7 +1615,60 @@ export default function App() {
         }
       }
 
-      // Strategy 3: Direct fetch with abort timeout
+      // Strategy 3: Dedicated Cloudflare Bypass Worker (Bypasses Iran filtering without VPN)
+      if (!sendSuccess && bypassWorkerUrl && bypassWorkerUrl.trim()) {
+        try {
+          const cleanBypass = bypassWorkerUrl.trim().replace(/\/+$/, '');
+          const currentOrigin = typeof window !== 'undefined' ? window.location.origin : '';
+          if (cleanBypass !== currentOrigin) {
+            // Try Base64 endpoint on worker
+            try {
+              const bRes = await fetch(`${cleanBypass}/api/telegram/sendPdf`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  chatId: targetChatId,
+                  pdfBase64: base64Pdf,
+                  filename,
+                  caption: cap,
+                  token: activeToken,
+                }),
+              });
+              if (bRes.ok) {
+                const bData = await bRes.json();
+                if (bData && bData.ok) {
+                  sendSuccess = true;
+                  responseData = bData;
+                }
+              }
+            } catch (_) {}
+
+            // Try /tg/ endpoint on worker
+            if (!sendSuccess) {
+              const bFormData = new FormData();
+              bFormData.append('chat_id', targetChatId);
+              bFormData.append('document', blob, filename);
+              bFormData.append('caption', cap);
+
+              const bTgRes = await fetch(`${cleanBypass}/tg/bot${activeToken}/sendDocument`, {
+                method: 'POST',
+                body: bFormData,
+              });
+              if (bTgRes.ok) {
+                const bTgData = await bTgRes.json();
+                if (bTgData && bTgData.ok) {
+                  sendSuccess = true;
+                  responseData = bTgData;
+                }
+              }
+            }
+          }
+        } catch (bErr) {
+          console.warn("Dedicated bypass worker failed:", bErr);
+        }
+      }
+
+      // Strategy 4: Direct fetch (Works when VPN is ON)
       if (!sendSuccess) {
         try {
           const controller = new AbortController();
@@ -3594,14 +3647,45 @@ export default function App() {
   async fetch(request) {
     const url = new URL(request.url);
 
-    // 1. Telegram API Proxy (ارسال فوری فایل‌ها به تلگرام بدون فیلترشکن)
-    if (url.pathname.startsWith('/tg/')) {
-      const tgPath = url.pathname.replace('/tg/', '');
-      const tgUrl = new URL(\`https://api.telegram.org/\${tgPath}\${url.search}\`);
-      return fetch(new Request(tgUrl, request));
+    if (request.method === "OPTIONS") {
+      return new Response(null, {
+        status: 204,
+        headers: {
+          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+          "Access-Control-Allow-Headers": "*",
+        },
+      });
     }
 
-    // 2. Proxy Frontend
+    // 1. Telegram API Reverse Proxy (بدون نیاز به وی‌پی‌ان در ایران)
+    if (url.pathname.startsWith('/tg/') || url.pathname.startsWith('/bot')) {
+      const tgPath = url.pathname.startsWith('/tg/') ? url.pathname.slice(4) : url.pathname.slice(1);
+      const tgUrl = \`https://api.telegram.org/\${tgPath}\${url.search}\`;
+
+      const forwardHeaders = new Headers();
+      for (const [key, value] of request.headers.entries()) {
+        const l = key.toLowerCase();
+        if (l !== 'host' && l !== 'content-length' && !l.startsWith('cf-')) {
+          forwardHeaders.set(key, value);
+        }
+      }
+
+      const tgResp = await fetch(tgUrl, {
+        method: request.method,
+        headers: forwardHeaders,
+        body: request.method !== 'GET' && request.method !== 'HEAD' ? request.body : undefined,
+      });
+
+      const respHeaders = new Headers(tgResp.headers);
+      respHeaders.set('Access-Control-Allow-Origin', '*');
+      respHeaders.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+      respHeaders.set('Access-Control-Allow-Headers', '*');
+
+      return new Response(tgResp.body, { status: tgResp.status, headers: respHeaders });
+    }
+
+    // 2. Static Assets or Proxy Frontend
     const destination = new URL("${publicAppUrl}");
     url.hostname = destination.hostname;
     url.protocol = destination.protocol;
@@ -3633,14 +3717,46 @@ export default function App() {
   async fetch(request) {
     const url = new URL(request.url);
 
-    // 1. Telegram API Proxy (ارسال فوری فایل‌ها به تلگرام بدون فیلترشکن)
-    if (url.pathname.startsWith('/tg/')) {
-      const tgPath = url.pathname.replace('/tg/', '');
-      const tgUrl = new URL(\`https://api.telegram.org/\${tgPath}\${url.search}\`);
-      return fetch(new Request(tgUrl, request));
+    // 1. CORS Preflight
+    if (request.method === "OPTIONS") {
+      return new Response(null, {
+        status: 204,
+        headers: {
+          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+          "Access-Control-Allow-Headers": "*",
+        },
+      });
     }
 
-    // 2. Proxy Frontend
+    // 2. Telegram API Proxy (بدون فیلترشکن در ایران)
+    if (url.pathname.startsWith('/tg/') || url.pathname.startsWith('/bot')) {
+      const tgPath = url.pathname.startsWith('/tg/') ? url.pathname.slice(4) : url.pathname.slice(1);
+      const tgUrl = \`https://api.telegram.org/\${tgPath}\${url.search}\`;
+
+      const headers = new Headers();
+      for (const [k, v] of request.headers.entries()) {
+        const l = k.toLowerCase();
+        if (l !== 'host' && l !== 'content-length' && !l.startsWith('cf-')) {
+          headers.set(k, v);
+        }
+      }
+
+      const tgResp = await fetch(tgUrl, {
+        method: request.method,
+        headers: headers,
+        body: request.method !== 'GET' && request.method !== 'HEAD' ? request.body : undefined,
+      });
+
+      const respHeaders = new Headers(tgResp.headers);
+      respHeaders.set('Access-Control-Allow-Origin', '*');
+      respHeaders.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+      respHeaders.set('Access-Control-Allow-Headers', '*');
+
+      return new Response(tgResp.body, { status: tgResp.status, headers: respHeaders });
+    }
+
+    // 3. Proxy Frontend
     const destination = new URL("${publicAppUrl}");
     url.hostname = destination.hostname;
     url.protocol = destination.protocol;
