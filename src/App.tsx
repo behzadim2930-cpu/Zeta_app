@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import jsPDF from 'jspdf';
-import html2canvas from 'html2canvas-pro';
+import html2canvas from 'html2canvas';
 import zetaLogo from './assets/logo.png';
 import {
   FileText,
