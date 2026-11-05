@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import jsPDF from 'jspdf';
-import html2canvas from 'html2canvas';
+import html2canvas from 'html2canvas-pro';
 import zetaLogo from './assets/logo.png';
 import {
   FileText,
@@ -605,38 +605,58 @@ export default function App() {
   }
 
   /**
-   * تابع کمکی جهت محاسبه دقیق ارتفاع هر بلوک بر حسب پیکسل در برگه فیزیکی A4
-   * با در نظر گرفتن ارتفاع پایه ردیف (۴۴ پیکسل)، خطوط طولانی مبحث و یادداشت‌های مشاور
+   * تابع کمکی جهت محاسبه دقیق و واقعی ارتفاع هر بلوک بر حسب پیکسل در برگه فیزیکی A4
+   * با در نظر گرفتن شکست خط مبحث، عنوان درس و یادداشت‌های چندخطی مشاور
    */
   const calculateBlockHeight = (block: Block): number => {
-    let height = 44; // ارتفاع پایه ردیف با پدینگ عمودی و فونت استاندارد
-    const topicLen = (block.topic || '').trim().length;
-    if (topicLen > 28) {
-      const extraTopicLines = Math.ceil((topicLen - 28) / 28);
-      height += extraTopicLines * 16;
+    let height = 50; // ارتفاع پایه ردیف با احتساب پدینگ عمودی ۱۲ پیکسل و بوردر
+    
+    // شکست خط نام درس در سلول عرض ۳۸۰ پیکسل (در کلمات طولانی بالای ۲۲ کاراکتر)
+    const subjectLen = (block.subject || '').trim().length;
+    if (subjectLen > 22) {
+      const extraSubjectLines = Math.ceil((subjectLen - 22) / 22);
+      height += extraSubjectLines * 18;
     }
+
+    // شکست خط مبحث درس (در کلمات طولانی بالای ۳۰ کاراکتر)
+    const topicLen = (block.topic || '').trim().length;
+    if (topicLen > 30) {
+      const extraTopicLines = Math.ceil((topicLen - 30) / 28);
+      height += extraTopicLines * 17;
+    }
+
+    // برچسب وضعیت اضافه (مانند تست زوج، مبحثی و ...)
     if (block.extra && block.extra.trim()) {
       height += 2;
     }
+
+    // یادداشت مشاور با پشتیبانی از خطوط شکسته \n و خطوط طولانی
     if (block.note && block.note.trim()) {
-      const noteLen = block.note.trim().length;
-      const noteLines = Math.max(1, Math.ceil(noteLen / 45));
-      height += 6 + (noteLines * 17);
+      const lines = block.note.trim().split('\n');
+      let totalNoteLines = 0;
+      for (const line of lines) {
+        const clean = line.trim();
+        totalNoteLines += Math.max(1, Math.ceil(clean.length / 42));
+      }
+      height += 10 + (totalNoteLines * 18);
     }
+
     return Math.ceil(height);
   };
 
   /**
-   * تابع کمکی برای محاسبه دقیق ارتفاع کارت یک روز
+   * تابع کمکی برای محاسبه دقیق ارتفاع کارت یک روز با در نظر گرفتن هدر و فاصله
    */
   const calculateDayHeight = (day: DayPlan | PageSection): number => {
     if (day.isRest) {
-      return 74; // کارت روز استراحت با پیام انگیزشی
+      const restLen = (day.restText || '').trim().length;
+      const extraLines = restLen > 55 ? Math.ceil((restLen - 55) / 50) : 0;
+      return 88 + (extraLines * 18);
     }
     if (day.blocks.length === 0) {
-      return 58; // کارت روز خالی
+      return 74;
     }
-    let total = 36; // ارتفاع هدر کارت روز به همراه بوردرها
+    let total = 46; // ارتفاع هدر کارت روز به همراه بوردرها
     for (const block of day.blocks) {
       total += calculateBlockHeight(block);
     }
@@ -646,14 +666,14 @@ export default function App() {
   /**
    * الگوریتم هوشمند صفحه‌بندی داینامیک و ضد سرریز A4:
    * ارتفاع فیزیکی A4 برابر ۱۱۲۳ پیکسل است.
-   * هدر اصلی، مشخصات دانش‌آموز، نمودار و راهنما در صفحه اول حدود ۳۹۶ پیکسل فضا دارند (بودجه امن روزها: ۵۴۰ پیکسل).
-   * در صفحات بعدی هدر مختصر است و بودجه امن روزها معادل ۸۸۰ پیکسل است.
-   * بخش اهداف و جدول ارزیابی به ۳۳۰ پیکسل فضا نیاز دارد.
+   * هدر اصلی، مشخصات دانش‌آموز، نمودار و راهنما در صفحه اول حدود ۴۲۵ پیکسل فضا دارند (بودجه امن روزها: ۵۲۰ پیکسل با ۱۵۵ پیکسل حاشیه اطمینان).
+   * در صفحات بعدی هدر مختصر است و بودجه امن روزها معادل ۸۲۰ پیکسل است (با ۱۸۰ پیکسل حاشیه اطمینان).
+   * بخش اهداف و جدول ارزیابی به ۳۴۵ پیکسل فضا نیاز دارد.
    */
   const dynamicPages = useMemo<DynamicPage[]>(() => {
-    const PAGE1_DAYS_BUDGET = 540;
-    const SUBSEQUENT_PAGE_BUDGET = 880;
-    const GOALS_TRACKER_HEIGHT = 330;
+    const PAGE1_DAYS_BUDGET = 520;
+    const SUBSEQUENT_PAGE_BUDGET = 820;
+    const GOALS_TRACKER_HEIGHT = 345;
 
     const pages: DynamicPage[] = [];
     let currentPageNum = 1;
@@ -687,8 +707,8 @@ export default function App() {
       const dayMins = calculateTotalMinutes(day);
 
       if (day.isRest) {
-        const secHeight = 74;
-        const gap = currentSections.length > 0 ? 8 : 0;
+        const secHeight = calculateDayHeight(day);
+        const gap = currentSections.length > 0 ? 10 : 0;
         if (currentHeight + gap + secHeight > currentBudget && currentSections.length > 0) {
           finalizeCurrentPage(false);
         }
@@ -702,13 +722,13 @@ export default function App() {
           totalDayMinutes: 0,
           totalDayBlocks: 0,
         });
-        currentHeight += (currentSections.length > 1 ? 8 : 0) + secHeight;
+        currentHeight += (currentSections.length > 1 ? 10 : 0) + secHeight;
         continue;
       }
 
       if (day.blocks.length === 0) {
-        const secHeight = 58;
-        const gap = currentSections.length > 0 ? 8 : 0;
+        const secHeight = 74;
+        const gap = currentSections.length > 0 ? 10 : 0;
         if (currentHeight + gap + secHeight > currentBudget && currentSections.length > 0) {
           finalizeCurrentPage(false);
         }
@@ -721,7 +741,7 @@ export default function App() {
           totalDayMinutes: 0,
           totalDayBlocks: 0,
         });
-        currentHeight += (currentSections.length > 1 ? 8 : 0) + secHeight;
+        currentHeight += (currentSections.length > 1 ? 10 : 0) + secHeight;
         continue;
       }
 
@@ -730,11 +750,11 @@ export default function App() {
       let chunkIndex = 1;
 
       while (remainingBlocks.length > 0) {
-        const gap = currentSections.length > 0 ? 8 : 0;
+        const gap = currentSections.length > 0 ? 10 : 0;
         const availableHeight = currentBudget - currentHeight - gap;
 
         // محاسبه کل ارتفاع پارت‌های باقیمانده این روز
-        let fullDayHeight = 36;
+        let fullDayHeight = 46;
         for (const b of remainingBlocks) {
           fullDayHeight += calculateBlockHeight(b);
         }
@@ -755,15 +775,15 @@ export default function App() {
           remainingBlocks = [];
         } else {
           // در فضای باقیمانده جا نمی‌شود:
-          // اگر صفحه جاری قبلاً روزهایی دارد و فضای باقیمانده کمتر از ۱۶۰ پیکسل است، تمیزتر است صفحه بعدی شروع شود:
-          if (currentSections.length > 0 && availableHeight < 160) {
+          // اگر صفحه جاری قبلاً روزهایی دارد و فضای باقیمانده کمتر از ۱۸۰ پیکسل است (کمتر از هدر و یک پارت مناسب):
+          if (currentSections.length > 0 && availableHeight < 180) {
             finalizeCurrentPage(false);
             continue;
           }
 
           // پارت‌هایی که در فضای موجود جا می‌گیرند را جدا می‌کنیم:
           let chunkBlocks: Block[] = [];
-          let chunkH = 36;
+          let chunkH = 46; // هدر کارت روز
           for (let bi = 0; bi < remainingBlocks.length; bi++) {
             const bh = calculateBlockHeight(remainingBlocks[bi]);
             if (chunkH + bh <= availableHeight) {
@@ -790,6 +810,7 @@ export default function App() {
             chunkIndex++;
             finalizeCurrentPage(false);
           } else {
+            // در صورتی که حتی یک پارت هم جا نشد، صفحه جدید باز می‌شود
             finalizeCurrentPage(false);
           }
         }
@@ -800,7 +821,7 @@ export default function App() {
     if (currentSections.length > 0) {
       const remainingSpace = currentBudget - currentHeight - 12;
 
-      // اگر در صفحه جاری فضای کافی (حداقل ۳۳۰ پیکسل) وجود داشته باشد:
+      // اگر در صفحه جاری فضای کافی (حداقل ۳۴۵ پیکسل) وجود داشته باشد:
       if (remainingSpace >= GOALS_TRACKER_HEIGHT) {
         finalizeCurrentPage(true);
       } else {
@@ -846,7 +867,7 @@ export default function App() {
     if (!currentPageData) {
       return { totalHeight: 0, maxBudget: 880, percentage: 0, isOptimal: true };
     }
-    const maxBudget = currentPageData.isFirstPage ? 540 : 880;
+    const maxBudget = currentPageData.isFirstPage ? 520 : 820;
     const totalHeight = currentPageData.estimatedHeight;
     return {
       totalHeight,
@@ -861,16 +882,17 @@ export default function App() {
     return (
       <div
         key={b.id}
-        className="block-row py-1.5 px-3 space-y-0.5"
+        className="block-row py-1.5 px-3 space-y-0.5 shrink-0"
         style={{
           breakInside: 'avoid',
           pageBreakInside: 'avoid',
+          flexShrink: 0,
         }}
       >
         <div style={{ display: 'table', width: '100%', tableLayout: 'fixed' }}>
-          <div style={{ display: 'table-cell', width: '110px', verticalAlign: 'middle' }}>
+          <div style={{ display: 'table-cell', width: '105px', verticalAlign: 'top', paddingTop: '3px' }}>
             <span
-              className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[9.5px] font-black ${
+              className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[9px] font-black ${
                 b.type === 'study'
                   ? 'bg-[#FFF1EA] text-[#C93A00]'
                   : b.type === 'test'
@@ -890,21 +912,21 @@ export default function App() {
               <span>{b.typeTitle}</span>
             </span>
           </div>
-          <div style={{ display: 'table-cell', verticalAlign: 'middle', padding: '0 8px', textAlign: 'right' }}>
-            <div className="font-black text-[12.5px] leading-[18px] text-[#111111]" style={{ letterSpacing: 'normal' }}>{b.subject}</div>
-            <div className="text-[10.5px] leading-[16px] text-[#3e3e3e] break-words font-medium" style={{ letterSpacing: 'normal' }}>{b.topic}</div>
+          <div style={{ display: 'table-cell', verticalAlign: 'top', padding: '0 8px', textAlign: 'right' }}>
+            <div className="font-black text-[12px] leading-[18px] text-[#111111] break-words" style={{ letterSpacing: 'normal' }}>{b.subject}</div>
+            <div className="text-[10px] leading-[16px] text-[#3e3e3e] break-words font-medium mt-0.5" style={{ letterSpacing: 'normal' }}>{b.topic}</div>
           </div>
-          <div style={{ display: 'table-cell', width: '120px', verticalAlign: 'middle', textAlign: 'left' }}>
+          <div style={{ display: 'table-cell', width: '115px', verticalAlign: 'top', paddingTop: '3px', textAlign: 'left' }}>
             {includeTimings ? (
               <>
-                <div className="font-black text-[11.5px] leading-[17px] whitespace-nowrap text-[#111111]" style={{ letterSpacing: 'normal' }}>
+                <div className="font-black text-[11px] leading-[16px] whitespace-nowrap text-[#111111]" style={{ letterSpacing: 'normal' }}>
                   {(b.startTime || b.endTime) ? `${b.startTime || '—'} – ${b.endTime || '—'}` : 'ساعت شناور'}
                 </div>
-                <div className="text-[9.5px] leading-[14px] text-[#6B6B6B] font-semibold" style={{ letterSpacing: 'normal' }}>{b.duration || 'مدت دلخواه'}</div>
+                <div className="text-[9px] leading-[14px] text-[#6B6B6B] font-semibold" style={{ letterSpacing: 'normal' }}>{b.duration || 'مدت دلخواه'}</div>
               </>
             ) : (
               <div>
-                <div className="font-bold text-[10px] leading-[16px] whitespace-nowrap text-[#222222] bg-[#f0eee9] border border-[#d8d3ca] rounded-md px-1.5 py-0.5 inline-block" style={{ letterSpacing: 'normal' }}>
+                <div className="font-bold text-[9.5px] leading-[15px] whitespace-nowrap text-[#222222] bg-[#f0eee9] border border-[#d8d3ca] rounded-md px-1.5 py-0.5 inline-block" style={{ letterSpacing: 'normal' }}>
                   ⏱️ زمان شناور
                 </div>
                 {b.duration && b.duration !== 'شناور' && (
@@ -913,16 +935,16 @@ export default function App() {
               </div>
             )}
           </div>
-          <div style={{ display: 'table-cell', width: '56px', verticalAlign: 'middle', textAlign: 'left' }}>
+          <div style={{ display: 'table-cell', width: '54px', verticalAlign: 'top', paddingTop: '3px', textAlign: 'left' }}>
             {b.extra && (
-              <span className="inline-block text-[9.5px] font-black text-[#C93A00] bg-[#FFF1EA] rounded px-1.5 py-0.5 whitespace-nowrap border border-[#ffd2bf]" style={{ letterSpacing: 'normal' }}>
+              <span className="inline-block text-[9px] font-black text-[#C93A00] bg-[#FFF1EA] rounded px-1.5 py-0.5 whitespace-nowrap border border-[#ffd2bf]" style={{ letterSpacing: 'normal' }}>
                 {b.extra}
               </span>
             )}
           </div>
         </div>
         {b.note && (
-          <div className="border-r-[2.5px] border-[#FF4F12] pr-2 text-[10px] leading-[1.6] text-[#444] mt-1 break-words font-medium" style={{ letterSpacing: 'normal' }}>
+          <div className="border-r-[2.5px] border-[#FF4F12] pr-2 text-[9.5px] leading-[1.6] text-[#444] mt-1 break-words font-medium whitespace-pre-wrap" style={{ letterSpacing: 'normal' }}>
             <span className="text-[#C93A00] font-bold ml-1">توصیه مشاور:</span>
             <span>{b.note}</span>
           </div>
@@ -1317,6 +1339,11 @@ export default function App() {
           }
         });
 
+        // Prevent any child crushing/squishing in flex container
+        clone.querySelectorAll<HTMLElement>('.day-card, .block-row, header, footer').forEach((el) => {
+          el.style.flexShrink = '0';
+        });
+
         // Preload and wait for any images inside the clone
         const images = Array.from(clone.querySelectorAll('img'));
         await Promise.all(
@@ -1331,8 +1358,8 @@ export default function App() {
 
         document.body.appendChild(clone);
 
-        // Wait a short tick for layout to compute
-        await new Promise((resolve) => setTimeout(resolve, 80));
+        // Wait a tick for layout and fonts to settle cleanly
+        await new Promise((resolve) => setTimeout(resolve, 120));
 
         // Optimized high-speed canvas capture with crystal-clear print quality
         const canvas = await html2canvas(clone, {
@@ -2056,7 +2083,7 @@ export default function App() {
                 {/* DYNAMIC MULTI-PAGE RENDERER (Dynamically expands or contracts pages based on schedule volume) */}
                 {(() => {
                   const renderMainHeader = () => (
-                    <header className="bg-[#111111] text-white flex items-center gap-4 px-[12mm] py-[3.5mm] border-b-[3.5px] border-[#FF4F12]">
+                    <header className="bg-[#111111] text-white flex items-center gap-4 px-[12mm] py-[3.5mm] border-b-[3.5px] border-[#FF4F12] shrink-0" style={{ flexShrink: 0 }}>
                       <div className="w-[20mm] h-[20mm] bg-white rounded-xl flex items-center justify-center p-1.5 shrink-0 shadow">
                         <img
                           src={zetaLogo}
@@ -2091,7 +2118,7 @@ export default function App() {
                   );
 
                   const renderMiniHeader = () => (
-                    <div className="mx-[12mm] py-2 flex justify-between items-center text-[11px] text-[#6B6B6B] border-b border-[#E8E8E8]">
+                    <div className="mx-[12mm] py-2 flex justify-between items-center text-[11px] text-[#6B6B6B] border-b border-[#E8E8E8] shrink-0" style={{ flexShrink: 0 }}>
                       <div className="flex items-center gap-2">
                         <span className="font-black text-[13px] text-[#111111]" style={{ letterSpacing: 'normal' }}>Zeta | زتا</span>
                         <span className="text-[9.5px] font-bold bg-[#FF4F12] text-white px-2 py-0.5 rounded-full">برنامه هفتگی اختصاصی</span>
@@ -2106,7 +2133,7 @@ export default function App() {
                   );
 
                   const renderPageFooter = (pageNum: number, totalPages: number) => (
-                    <footer className="mx-[12mm] py-2 border-t-[1.5px] border-[#FF4F12] flex justify-between items-center text-[10px] text-[#6B6B6B] shrink-0">
+                    <footer className="mx-[12mm] py-2 border-t-[1.5px] border-[#FF4F12] flex justify-between items-center text-[10px] text-[#6B6B6B] shrink-0" style={{ flexShrink: 0 }}>
                       <span className="font-extrabold text-[#111111]">Zeta | زتا</span>
                       <span>صفحه {pageNum} از {totalPages}</span>
                       <span>{advisor.createdDate || 'برنامه هفتگی اختصاصی'}</span>
@@ -2114,7 +2141,7 @@ export default function App() {
                   );
 
                   const renderInfoCard = () => (
-                    <div style={{ display: 'table', width: '100%', tableLayout: 'fixed' }} className="border-[1.5px] border-[#FF4F12] rounded-[12px] overflow-hidden bg-white shadow-2xs">
+                    <div style={{ display: 'table', width: '100%', tableLayout: 'fixed', flexShrink: 0 }} className="border-[1.5px] border-[#FF4F12] rounded-[12px] overflow-hidden bg-white shadow-2xs shrink-0">
                       <div style={{ display: 'table-cell', width: '50%', verticalAlign: 'top' }} className="p-2 px-3">
                         <div className="flex items-center justify-between border-b border-[#f0ece6] pb-1 mb-1">
                           <div className="flex items-center gap-1.5 text-[10.5px] font-black text-[#C93A00]">
@@ -2169,7 +2196,7 @@ export default function App() {
                   );
 
                   const renderChartAndStats = () => (
-                    <div style={{ display: 'table', width: '100%', tableLayout: 'fixed' }} className="bg-[#F6F3EF] rounded-[12px] p-2.5">
+                    <div style={{ display: 'table', width: '100%', tableLayout: 'fixed', flexShrink: 0 }} className="bg-[#F6F3EF] rounded-[12px] p-2.5 shrink-0">
                       <div style={{ display: 'table-cell', width: '130px', verticalAlign: 'middle', paddingLeft: '10px', borderLeft: '1px solid #e3ddd5' }}>
                         {includeTimings ? (
                           <>
@@ -2224,7 +2251,7 @@ export default function App() {
                   );
 
                   const renderLegendChips = () => (
-                    <div className="flex flex-wrap gap-1.5 items-center">
+                    <div className="flex flex-wrap gap-1.5 items-center shrink-0" style={{ flexShrink: 0 }}>
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold bg-[#FFF1EA] text-[#C93A00]">
                         {renderIcon('study')}
                         <span>مطالعه</span>
@@ -2261,10 +2288,11 @@ export default function App() {
                       key={`${section.dayId}_${section.isContinued ? 'cont' : 'main'}`}
                       data-day-id={section.dayId}
                       data-day-card="true"
-                      className="day day-card border border-[#E8E8E8] rounded-[12px] overflow-hidden break-inside-avoid bg-white shadow-2xs"
+                      className="day day-card border border-[#E8E8E8] rounded-[12px] overflow-hidden break-inside-avoid bg-white shadow-2xs shrink-0"
                       style={{
                         breakInside: 'avoid',
                         pageBreakInside: 'avoid',
+                        flexShrink: 0,
                       }}
                     >
                       {section.isRest ? (
@@ -2331,13 +2359,14 @@ export default function App() {
                   );
 
                   const renderGoalsAndTracker = (isDedicatedPage: boolean = false) => (
-                    <div className="space-y-2.5">
+                    <div className="space-y-2.5 shrink-0" style={{ flexShrink: 0 }}>
                       {/* Goals Section */}
                       <div
-                        className="day-card card-avoid-break bg-[#FFF1EA] rounded-[12px] p-2.5 border border-[#ffd2bf] break-inside-avoid shadow-2xs"
+                        className="day-card card-avoid-break bg-[#FFF1EA] rounded-[12px] p-2.5 border border-[#ffd2bf] break-inside-avoid shadow-2xs shrink-0"
                         style={{
                           breakInside: 'avoid',
                           pageBreakInside: 'avoid',
+                          flexShrink: 0,
                         }}
                       >
                         <div className="flex items-center justify-between border-b border-[#ffd2bf] pb-1 mb-1">
@@ -2360,10 +2389,11 @@ export default function App() {
 
                       {/* Tracker Table */}
                       <div
-                        className="day-card card-avoid-break break-inside-avoid"
+                        className="day-card card-avoid-break break-inside-avoid shrink-0"
                         style={{
                           breakInside: 'avoid',
                           pageBreakInside: 'avoid',
+                          flexShrink: 0,
                         }}
                       >
                         <div className="flex items-center justify-between mb-1">
